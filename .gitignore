@@ -1,0 +1,42 @@
+# Env files
+.env
+.env.local
+**/.env
+!**/.env.example
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.idea/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+android/.gradle/
+android/app/debug
+android/app/profile
+android/app/release
+android/local.properties
+.metadata
+pubspec.lock
+**/*.g.dart
+**/*.freezed.dart
+**/*.gr.dart
+supabase.json
+
+# Supabase
+supabase/.branches
+supabase/.temp
+supabase/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+*.iml
+*.swp

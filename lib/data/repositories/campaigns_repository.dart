@@ -1,0 +1,208 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'package:dungeonku/data/models/campaign.dart';
+import 'package:dungeonku/data/models/character.dart';
+import 'package:dungeonku/data/models/messages.dart';
+import 'package:dungeonku/data/supabase_providers.dart';
+
+class CampaignsRepository {
+  CampaignsRepository(this._sb);
+  final SupabaseClient _sb;
+
+  Future<List<Campaign>> list(String userId) async {
+    final rows = await _sb
+        .from('campaigns')
+        .select()
+        .eq('user_id', userId)
+        .order('last_played_at', ascending: false);
+    return (rows as List<dynamic>)
+        .map((r) => Campaign.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// Create a new campaign + populate the per-campaign character snapshot, copy starting
+  /// skills, and seed campaign_bosses from the chosen story template. We do this client-side
+  /// to keep the flow simple; a stored procedure could replace this for atomicity.
+  Future<Campaign> create({
+    required String userId,
+    required String characterId,
+    required String templateId,
+    required String name,
+  }) async {
+    // Look up the character so we know its class for the snapshot.
+    final charRow = await _sb
+        .from('characters')
+        .select('id, class, base_element, stats')
+        .eq('id', characterId)
+        .single();
+    final classId = charRow['class'] as String;
+    final baseElement = charRow['base_element'] as String;
+    final stats = (charRow['stats'] as Map<String, dynamic>);
+
+    // Look up the class definition for HP/resource defaults.
+    final classRow = await _sb
+        .from('class_definitions')
+        .select('starting_hp, resource_type, starting_resource, starting_ac, starting_skills')
+        .eq('id', classId)
+        .single();
+
+    // Insert the campaign row.
+    final campaignInserted = await _sb
+        .from('campaigns')
+        .insert({
+          'user_id': userId,
+          'character_id': characterId,
+          'template_id': templateId,
+          'name': name,
+        })
+        .select()
+        .single();
+    final campaign = Campaign.fromJson(campaignInserted);
+
+    // Per-campaign character snapshot.
+    await _sb.from('campaign_characters').insert({
+      'campaign_id': campaign.id,
+      'character_id': characterId,
+      'level': 1,
+      'xp': 0,
+      'hp': classRow['starting_hp'],
+      'max_hp': classRow['starting_hp'],
+      'resource_type': classRow['resource_type'],
+      'resource_current': classRow['starting_resource'],
+      'resource_max': classRow['starting_resource'],
+      'ac': classRow['starting_ac'],
+      'current_stats': stats,
+      'status_effects': <Map<String, dynamic>>[],
+      'base_element': baseElement,
+    });
+
+    // Starting skills.
+    final startingSkills = (classRow['starting_skills'] as List<dynamic>?) ?? const [];
+    if (startingSkills.isNotEmpty) {
+      await _sb.from('campaign_skills').insert([
+        for (final s in startingSkills)
+          {
+            'campaign_id': campaign.id,
+            'skill_id': s as String,
+            'learned_at_turn': 0,
+          },
+      ]);
+    }
+
+    // Seed boss progression.
+    final bossRows = await _sb
+        .from('template_bosses')
+        .select('id')
+        .eq('template_id', templateId);
+    if ((bossRows as List<dynamic>).isNotEmpty) {
+      await _sb.from('campaign_bosses').insert([
+        for (final b in bossRows)
+          {
+            'campaign_id': campaign.id,
+            'template_boss_id': (b as Map<String, dynamic>)['id'] as String,
+            'status': 'unencountered',
+          },
+      ]);
+    }
+
+    // Seed the opening DM message from the template.
+    final tmpl = await _sb
+        .from('story_templates')
+        .select('opening_scene')
+        .eq('id', templateId)
+        .single();
+    await _sb.from('messages').insert({
+      'campaign_id': campaign.id,
+      'role': 'dm',
+      'content': tmpl['opening_scene'] as String,
+      'situation_type': 'transition',
+      'options': [
+        {'id': 'tc_look',   'label': 'Look around',        'kind': 'template_common', 'icon': 'eye'},
+        {'id': 'tc_search', 'label': 'Search for clues',   'kind': 'template_common', 'icon': 'magnify'},
+        {'id': 'tc_move',   'label': 'Move on',            'kind': 'template_common', 'icon': 'footstep'},
+      ],
+      'was_cheap_resolve': false,
+    });
+
+    return campaign;
+  }
+
+  Future<void> rename(String campaignId, String name) async {
+    await _sb.from('campaigns').update({'name': name}).eq('id', campaignId);
+  }
+
+  Future<void> delete(String campaignId) async {
+    await _sb.from('campaigns').delete().eq('id', campaignId);
+  }
+
+  // --------------------- Per-campaign reads ---------------------
+
+  Future<CampaignCharacter> loadCampaignCharacter(String campaignId) async {
+    final row = await _sb
+        .from('campaign_characters')
+        .select()
+        .eq('campaign_id', campaignId)
+        .single();
+    return CampaignCharacter.fromJson(row);
+  }
+
+  Future<List<InventoryItem>> loadInventory(String campaignId) async {
+    final rows = await _sb.from('campaign_inventory').select().eq('campaign_id', campaignId);
+    return (rows as List<dynamic>)
+        .map((r) => InventoryItem.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<CampaignBoss>> loadBosses(String campaignId) async {
+    final rows = await _sb
+        .from('campaign_bosses')
+        .select('*, template_bosses(name, tier)')
+        .eq('campaign_id', campaignId);
+    return (rows as List<dynamic>)
+        .map((r) => CampaignBoss.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<CampaignSideMission>> loadSideMissions(String campaignId) async {
+    final rows = await _sb
+        .from('campaign_side_missions')
+        .select('*, template_side_missions(title)')
+        .eq('campaign_id', campaignId);
+    return (rows as List<dynamic>)
+        .map((r) => CampaignSideMission.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<GameMessage>> loadMessages(String campaignId, {int limit = 50}) async {
+    final rows = await _sb
+        .from('messages')
+        .select()
+        .eq('campaign_id', campaignId)
+        .order('created_at')
+        .limit(limit);
+    return (rows as List<dynamic>)
+        .map((r) => GameMessage.fromJson(r as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  Future<List<String>> loadLearnedSkillIds(String campaignId) async {
+    final rows = await _sb
+        .from('campaign_skills')
+        .select('skill_id')
+        .eq('campaign_id', campaignId);
+    return (rows as List<dynamic>)
+        .map((r) => (r as Map<String, dynamic>)['skill_id'] as String)
+        .toList(growable: false);
+  }
+}
+
+final campaignsRepositoryProvider = Provider<CampaignsRepository>((ref) {
+  return CampaignsRepository(ref.watch(supabaseClientProvider));
+});
+
+final campaignsListProvider = FutureProvider<List<Campaign>>((ref) async {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return [];
+  return ref.watch(campaignsRepositoryProvider).list(user.id);
+});
