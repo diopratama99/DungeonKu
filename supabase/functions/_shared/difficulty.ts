@@ -46,11 +46,23 @@ export const DIFFICULTY = {
   antiStallThresholdTurns: 4,
 
   // Adaptive token budget per turn (situation classifier picks one of these).
+  // History:
+  //   - Originally tight (120/180/220/300) when we used response_format:
+  //     json_schema, where the API fills leaf values with no JSON-structure
+  //     overhead.
+  //   - After moving to response_format: json_object for GitHub-Models /
+  //     proxy compatibility, the model has to emit the JSON braces / keys /
+  //     quotes / commas itself, so we bumped to 350/500/600/700.
+  //   - Saw production truncations on resolve-roll (critical_fail
+  //     narrations + 3 options + remaining schema fields hit exactly the
+  //     500-token exploration cap). Bumped again to the values below — the
+  //     cap is an upper bound, not a target, so larger caps only matter
+  //     when the response is genuinely big.
   maxTokensBySituation: {
-    dialog: 120,
-    exploration: 180,
-    combat: 220,
-    transition: 300,
+    dialog: 500,
+    exploration: 800,
+    combat: 900,
+    transition: 1000,
   },
 
   // Death narration token cap.

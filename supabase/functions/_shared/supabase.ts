@@ -10,11 +10,16 @@ import { createClient } from "./deps.ts";
 import type { SupabaseClient, User } from "./deps.ts";
 import { ENV } from "./env.ts";
 
+// All `.from()` and `.rpc()` calls in this app target the dungeonku schema.
+// Centralized here so Edge Functions can stay schema-unaware in their bodies.
+const APP_SCHEMA = "dungeonku";
+
 let cachedService: SupabaseClient | null = null;
 
 export function getServiceClient(): SupabaseClient {
   if (cachedService) return cachedService;
   cachedService = createClient(ENV.SUPABASE_URL(), ENV.SUPABASE_SERVICE_ROLE_KEY(), {
+    db: { schema: APP_SCHEMA },
     auth: { persistSession: false, autoRefreshToken: false },
   });
   return cachedService;
@@ -26,7 +31,10 @@ export async function getAuthenticatedUser(req: Request): Promise<User | null> {
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!token) return null;
 
+  // For auth.getUser() schema doesn't matter (uses GoTrue endpoints, not PostgREST).
+  // We still set it so any incidental .from() on this client targets the right schema.
   const userClient = createClient(ENV.SUPABASE_URL(), ENV.SUPABASE_ANON_KEY(), {
+    db: { schema: APP_SCHEMA },
     global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });

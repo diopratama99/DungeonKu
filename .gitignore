@@ -4,6 +4,9 @@
 **/.env
 !**/.env.example
 
+#Command Line
+command_line.md
+
 # Flutter / Dart
 .dart_tool/
 .flutter-plugins

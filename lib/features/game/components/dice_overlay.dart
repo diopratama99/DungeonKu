@@ -14,34 +14,56 @@ class DiceOverlay extends StatefulWidget {
   const DiceOverlay({
     required this.requiresRoll,
     required this.result,
-    required this.onTapDice,
     required this.onDone,
+    this.onTapDice,
+    this.autoStart = false,
     super.key,
   });
 
   final RequiresRoll requiresRoll;
   final ResolveRollResult? result;
-  final VoidCallback onTapDice;
+
+  /// Called when the user manually taps the in-overlay roll button.
+  /// Optional because in the current UX the player triggers the roll from the
+  /// action panel before the overlay even appears — [autoStart] is then
+  /// used so the overlay tumbles immediately on mount.
+  final VoidCallback? onTapDice;
+
+  /// Called once the result has landed and the celebratory hold finishes.
+  /// Owner is expected to dismiss the overlay (clear roll state, refresh
+  /// messages, etc) here.
   final VoidCallback onDone;
+
+  /// If true, start tumbling the dice the moment the widget mounts. The
+  /// in-overlay “Tap to roll” button is suppressed in this mode.
+  final bool autoStart;
 
   @override
   State<DiceOverlay> createState() => _DiceOverlayState();
 }
 
-class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStateMixin {
+class _DiceOverlayState extends State<DiceOverlay>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   bool _rolling = false;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500))
       ..addStatusListener((s) {
         if (s == AnimationStatus.completed && widget.result != null) {
           // Hold on the face for a moment, then call onDone.
           Future.delayed(const Duration(milliseconds: 800), widget.onDone);
         }
       });
+    if (widget.autoStart) {
+      // Start tumbling immediately. The result will land once the parent
+      // sets `widget.result` (didUpdateWidget keeps the controller running).
+      _rolling = true;
+      _ctrl.forward();
+    }
   }
 
   @override
@@ -50,6 +72,14 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
     // When result arrives mid-animation, let the animation play out.
     if (widget.result != null && _ctrl.status != AnimationStatus.completed) {
       _ctrl.forward();
+    }
+    // If the result lands AFTER the controller already completed (rare but
+    // possible if API is faster than the 1.5s tumble), the addStatusListener
+    // never re-fires. Schedule the hand-off here so onDone still gets called.
+    if (widget.result != null &&
+        old.result == null &&
+        _ctrl.status == AnimationStatus.completed) {
+      Future.delayed(const Duration(milliseconds: 800), widget.onDone);
     }
   }
 
@@ -62,7 +92,7 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
   void _startRoll() {
     if (_rolling) return;
     setState(() => _rolling = true);
-    widget.onTapDice();
+    widget.onTapDice?.call();
     _ctrl.forward();
   }
 
@@ -94,11 +124,14 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
                   animation: _ctrl,
                   builder: (context, _) {
                     final t = _ctrl.value;
-                    final landed = widget.result != null && _ctrl.status == AnimationStatus.completed;
+                    final landed = widget.result != null &&
+                        _ctrl.status == AnimationStatus.completed;
                     return _DieFace(
                       face: landed
                           ? widget.result!.raw
-                          : _rolling ? (1 + (t * 60).floor() % _maxFace()) : _maxFace(),
+                          : _rolling
+                              ? (1 + (t * 60).floor() % _maxFace())
+                              : _maxFace(),
                       dice: widget.requiresRoll.dice,
                       tumbling: _rolling && !landed,
                       progress: t,
@@ -106,7 +139,8 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
                   },
                 ),
                 const SizedBox(height: 16),
-                if (widget.result != null && _ctrl.status == AnimationStatus.completed) ...[
+                if (widget.result != null &&
+                    _ctrl.status == AnimationStatus.completed) ...[
                   _ResultBlock(result: widget.result!),
                   const SizedBox(height: 12),
                   PixelButton(
@@ -114,14 +148,17 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
                     icon: Icons.arrow_forward,
                     onPressed: widget.onDone,
                   ),
-                ] else if (!_rolling)
+                ] else if (!_rolling &&
+                    !widget.autoStart &&
+                    widget.onTapDice != null)
                   PixelButton(
                     label: 'Tap to roll',
                     icon: Icons.casino,
                     onPressed: _startRoll,
                   )
                 else
-                  Text('Rolling...', style: AppTheme.vt323(20, color: PixelColors.textMuted)),
+                  Text('Rolling...',
+                      style: AppTheme.vt323(20, color: PixelColors.textMuted)),
               ],
             ),
           ),
@@ -132,16 +169,24 @@ class _DiceOverlayState extends State<DiceOverlay> with SingleTickerProviderStat
 
   int _maxFace() {
     switch (widget.requiresRoll.dice) {
-      case 'd20': return 20;
-      case 'd6':  return 6;
-      case 'd100': return 100;
-      default:    return 20;
+      case 'd20':
+        return 20;
+      case 'd6':
+        return 6;
+      case 'd100':
+        return 100;
+      default:
+        return 20;
     }
   }
 }
 
 class _DieFace extends StatelessWidget {
-  const _DieFace({required this.face, required this.dice, required this.tumbling, required this.progress});
+  const _DieFace(
+      {required this.face,
+      required this.dice,
+      required this.tumbling,
+      required this.progress});
   final int face;
   final String dice;
   final bool tumbling;
@@ -182,17 +227,17 @@ class _ResultBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final tone = switch (result.outcome) {
       'critical_success' => PixelColors.accentGold,
-      'success'          => PixelColors.accentGreen,
-      'fail'             => PixelColors.accentRed,
-      'critical_fail'    => PixelColors.accentRed,
-      _                  => PixelColors.textOnInk,
+      'success' => PixelColors.accentGreen,
+      'fail' => PixelColors.accentRed,
+      'critical_fail' => PixelColors.accentRed,
+      _ => PixelColors.textOnInk,
     };
     final label = switch (result.outcome) {
       'critical_success' => 'CRITICAL SUCCESS',
-      'success'          => 'SUCCESS',
-      'fail'             => 'FAILURE',
-      'critical_fail'    => 'CRITICAL FAILURE',
-      _                  => result.outcome.toUpperCase(),
+      'success' => 'SUCCESS',
+      'fail' => 'FAILURE',
+      'critical_fail' => 'CRITICAL FAILURE',
+      _ => result.outcome.toUpperCase(),
     };
     return Column(
       children: [

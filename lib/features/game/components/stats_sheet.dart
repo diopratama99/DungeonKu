@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
+import 'package:dungeonku/core/widgets/element_icon.dart';
 import 'package:dungeonku/core/widgets/pixel_panel.dart';
 import 'package:dungeonku/core/widgets/pixel_progress_bar.dart';
 import 'package:dungeonku/data/models/campaign.dart';
@@ -26,8 +27,11 @@ class StatsSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final knownSkills = allSkills.where((s) => skillIds.contains(s.id)).toList(growable: false);
-    final resourceColor = character.resourceType == 'mp' ? PixelColors.mpBar : PixelColors.staminaBar;
+    final knownSkills =
+        allSkills.where((s) => skillIds.contains(s.id)).toList(growable: false);
+    final resourceColor = character.resourceType == 'mp'
+        ? PixelColors.mpBar
+        : PixelColors.staminaBar;
 
     return DraggableScrollableSheet(
       expand: false,
@@ -36,39 +40,58 @@ class StatsSheet extends StatelessWidget {
       minChildSize: 0.3,
       builder: (ctx, scroll) {
         return Container(
-          decoration: const BoxDecoration(color: PixelColors.panelBackground),
+          decoration: const BoxDecoration(
+            color: PixelColors.panelBackground,
+            border: Border(
+              top: BorderSide(color: PixelColors.borderHighlight, width: 2),
+            ),
+          ),
           child: ListView(
             controller: scroll,
             padding: const EdgeInsets.all(16),
             children: [
               Center(
-                child: Container(width: 60, height: 4, color: PixelColors.borderSoft),
+                child: Container(
+                    width: 60, height: 4, color: PixelColors.borderHighlight),
               ),
               const SizedBox(height: 12),
-              Text('CHARACTER', style: AppTheme.pressStart(12, color: PixelColors.accentGold)),
+              Row(
+                children: [
+                  Container(width: 8, height: 8, color: PixelColors.accentGold),
+                  const SizedBox(width: 8),
+                  Text('CHARACTER',
+                      style: AppTheme.pressStart(12,
+                          color: PixelColors.accentGold)),
+                ],
+              ),
               const SizedBox(height: 12),
               PixelPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     PixelProgressBar(
-                      label: 'HP', current: character.hp, max: character.maxHp,
+                      label: 'HP',
+                      current: character.hp,
+                      max: character.maxHp,
                       fillColor: PixelColors.hpBar,
                     ),
                     const SizedBox(height: 8),
                     PixelProgressBar(
                       label: character.resourceType.toUpperCase(),
-                      current: character.resourceCurrent, max: character.resourceMax,
+                      current: character.resourceCurrent,
+                      max: character.resourceMax,
                       fillColor: resourceColor,
                     ),
                     const SizedBox(height: 8),
-                    Text('LVL ${character.level} · AC ${character.ac} · XP ${character.xp}',
-                        style: AppTheme.pressStart(10, color: PixelColors.textMuted)),
+                    Text(
+                        'LVL ${character.level} · AC ${character.ac} · XP ${character.xp}',
+                        style: AppTheme.pressStart(10,
+                            color: PixelColors.textMuted)),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
-              Text('STATS', style: AppTheme.pressStart(11, color: PixelColors.accentGold)),
+              _SheetLabel('STATS', PixelColors.accentBlue),
               const SizedBox(height: 8),
               PixelPanel(
                 child: Wrap(
@@ -82,7 +105,7 @@ class StatsSheet extends StatelessWidget {
               ),
               if (character.statusEffects.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('STATUS', style: AppTheme.pressStart(11, color: PixelColors.accentGold)),
+                _SheetLabel('STATUS', PixelColors.accentRed),
                 const SizedBox(height: 8),
                 PixelPanel(
                   child: Column(
@@ -96,13 +119,17 @@ class StatsSheet extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 16),
-              Text('SKILLS', style: AppTheme.pressStart(11, color: PixelColors.accentGold)),
+              _SheetLabel('SKILLS', PixelColors.accentPurple),
               const SizedBox(height: 8),
               PixelPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: knownSkills.isEmpty
-                      ? [Text('(none)', style: AppTheme.vt323(18, color: PixelColors.textMuted))]
+                      ? [
+                          Text('(none)',
+                              style: AppTheme.vt323(18,
+                                  color: PixelColors.textMuted))
+                        ]
                       : [
                           for (final s in knownSkills)
                             _SkillRow(skill: s, character: character),
@@ -110,13 +137,17 @@ class StatsSheet extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text('INVENTORY', style: AppTheme.pressStart(11, color: PixelColors.accentGold)),
+              _SheetLabel('INVENTORY', PixelColors.accentGreen),
               const SizedBox(height: 8),
               PixelPanel(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: inventory.isEmpty
-                      ? [Text('(empty)', style: AppTheme.vt323(18, color: PixelColors.textMuted))]
+                      ? [
+                          Text('(empty)',
+                              style: AppTheme.vt323(18,
+                                  color: PixelColors.textMuted))
+                        ]
                       : [
                           for (final i in inventory)
                             Text('${i.name} x${i.qty} · ${i.itemType}',
@@ -133,6 +164,24 @@ class StatsSheet extends StatelessWidget {
   }
 }
 
+class _SheetLabel extends StatelessWidget {
+  const _SheetLabel(this.text, this.tone);
+  final String text;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          children: [
+            Container(width: 8, height: 8, color: tone),
+            const SizedBox(width: 8),
+            Text(text, style: AppTheme.pressStart(11, color: tone)),
+          ],
+        ),
+      );
+}
+
 class _SkillRow extends StatelessWidget {
   const _SkillRow({required this.skill, required this.character});
   final Skill skill;
@@ -140,22 +189,29 @@ class _SkillRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final affordable = skill.costType == 'free'
-        || (skill.costType == character.resourceType && character.resourceCurrent >= skill.costAmount);
+    final affordable = skill.costType == 'free' ||
+        (skill.costType == character.resourceType &&
+            character.resourceCurrent >= skill.costAmount);
     final color = affordable ? PixelColors.textOnInk : PixelColors.textMuted;
-    final costText = skill.costType == 'free' ? 'free' : '${skill.costAmount} ${skill.costType}';
+    final costText = skill.costType == 'free'
+        ? 'free'
+        : '${skill.costAmount} ${skill.costType}';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 8),
+            child: ElementIcon(element: skill.element, size: 22),
+          ),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${skill.name}  [${skill.element}]',
-                    style: AppTheme.pressStart(9, color: color)),
-                Text(skill.description, style: AppTheme.vt323(16, color: color)),
+                Text(skill.name, style: AppTheme.pressStart(9, color: color)),
+                Text(skill.description,
+                    style: AppTheme.vt323(16, color: color)),
               ],
             ),
           ),

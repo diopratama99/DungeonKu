@@ -8,7 +8,7 @@ import 'package:dungeonku/data/supabase_providers.dart';
 
 class CampaignsRepository {
   CampaignsRepository(this._sb);
-  final SupabaseClient _sb;
+  final SupabaseQuerySchema _sb;
 
   Future<List<Campaign>> list(String userId) async {
     final rows = await _sb
@@ -43,7 +43,8 @@ class CampaignsRepository {
     // Look up the class definition for HP/resource defaults.
     final classRow = await _sb
         .from('class_definitions')
-        .select('starting_hp, resource_type, starting_resource, starting_ac, starting_skills')
+        .select(
+            'starting_hp, resource_type, starting_resource, starting_ac, starting_skills')
         .eq('id', classId)
         .single();
 
@@ -78,7 +79,8 @@ class CampaignsRepository {
     });
 
     // Starting skills.
-    final startingSkills = (classRow['starting_skills'] as List<dynamic>?) ?? const [];
+    final startingSkills =
+        (classRow['starting_skills'] as List<dynamic>?) ?? const [];
     if (startingSkills.isNotEmpty) {
       await _sb.from('campaign_skills').insert([
         for (final s in startingSkills)
@@ -100,7 +102,7 @@ class CampaignsRepository {
         for (final b in bossRows)
           {
             'campaign_id': campaign.id,
-            'template_boss_id': (b as Map<String, dynamic>)['id'] as String,
+            'template_boss_id': b['id'] as String,
             'status': 'unencountered',
           },
       ]);
@@ -118,9 +120,24 @@ class CampaignsRepository {
       'content': tmpl['opening_scene'] as String,
       'situation_type': 'transition',
       'options': [
-        {'id': 'tc_look',   'label': 'Look around',        'kind': 'template_common', 'icon': 'eye'},
-        {'id': 'tc_search', 'label': 'Search for clues',   'kind': 'template_common', 'icon': 'magnify'},
-        {'id': 'tc_move',   'label': 'Move on',            'kind': 'template_common', 'icon': 'footstep'},
+        {
+          'id': 'tc_look',
+          'label': 'Look around',
+          'kind': 'template_common',
+          'icon': 'eye'
+        },
+        {
+          'id': 'tc_search',
+          'label': 'Search for clues',
+          'kind': 'template_common',
+          'icon': 'magnify'
+        },
+        {
+          'id': 'tc_move',
+          'label': 'Move on',
+          'kind': 'template_common',
+          'icon': 'footstep'
+        },
       ],
       'was_cheap_resolve': false,
     });
@@ -148,7 +165,10 @@ class CampaignsRepository {
   }
 
   Future<List<InventoryItem>> loadInventory(String campaignId) async {
-    final rows = await _sb.from('campaign_inventory').select().eq('campaign_id', campaignId);
+    final rows = await _sb
+        .from('campaign_inventory')
+        .select()
+        .eq('campaign_id', campaignId);
     return (rows as List<dynamic>)
         .map((r) => InventoryItem.fromJson(r as Map<String, dynamic>))
         .toList(growable: false);
@@ -174,16 +194,25 @@ class CampaignsRepository {
         .toList(growable: false);
   }
 
-  Future<List<GameMessage>> loadMessages(String campaignId, {int limit = 50}) async {
+  Future<List<GameMessage>> loadMessages(String campaignId,
+      {int limit = 50}) async {
+    // We query DESC so `LIMIT n` keeps the NEWEST n messages (the relevant
+    // tail of a long campaign), then reverse client-side so the chat UI
+    // gets them in chronological order (oldest first, newest last).
+    //
+    // (postgrest-dart\u2019s `.order()` defaults `ascending: false`, opposite of
+    // supabase-js. The previous code returned newest-first to the UI by
+    // accident, which is what made the chat appear inverted.)
     final rows = await _sb
         .from('messages')
         .select()
         .eq('campaign_id', campaignId)
-        .order('created_at')
+        .order('created_at', ascending: false)
         .limit(limit);
-    return (rows as List<dynamic>)
+    final list = (rows as List<dynamic>)
         .map((r) => GameMessage.fromJson(r as Map<String, dynamic>))
-        .toList(growable: false);
+        .toList();
+    return list.reversed.toList(growable: false);
   }
 
   Future<List<String>> loadLearnedSkillIds(String campaignId) async {
@@ -198,7 +227,7 @@ class CampaignsRepository {
 }
 
 final campaignsRepositoryProvider = Provider<CampaignsRepository>((ref) {
-  return CampaignsRepository(ref.watch(supabaseClientProvider));
+  return CampaignsRepository(ref.watch(dbProvider));
 });
 
 final campaignsListProvider = FutureProvider<List<Campaign>>((ref) async {

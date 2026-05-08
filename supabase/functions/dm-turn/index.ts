@@ -402,9 +402,17 @@ function mergeOptions(dm: DmTurnOutput, situation: SituationType): DmTurnOutput[
   if (llmOptions.length >= cap) {
     return llmOptions.slice(0, cap);
   }
-  // Fill with template_common.
+  // Fill with template_common. Shuffle the pool so when the LLM consistently
+  // under-delivers, the player isn't stuck staring at the SAME three generic
+  // actions every turn. The pool itself is small (4 entries per situation),
+  // so shuffling rotates the visible trio nicely.
   const need = cap - llmOptions.length;
-  const fillers = TEMPLATE_COMMON_ACTIONS[situation]
+  const pool = TEMPLATE_COMMON_ACTIONS[situation].slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const fillers = pool
     .slice(0, need)
     .map((a) => ({ id: a.id, label: a.label, kind: "template_common" as const, icon: a.icon }));
   return [...llmOptions, ...fillers].slice(0, cap);

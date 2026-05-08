@@ -15,6 +15,11 @@ const POOLS = {
     "You linger a moment, taking in the scene. Memorising. Calculating.",
     "You scan the area methodically. A few details register, none yet useful.",
     "Your gaze travels the walls, the floor, the ceiling — habit, not panic.",
+    "You pause and let the place show itself to you. It does, slowly.",
+    "You watch the way the light falls. Things hide where shadows pool.",
+    "You stand still and let the world settle around you. The map clarifies.",
+    "You take stock — exits, hazards, anything that does not belong. Noted.",
+    "You read the room the way a hunter reads tracks. Patient.",
   ],
   exploration_search_clues: [
     "You comb the area carefully. A faint scuff in the dust, perhaps something more.",
@@ -22,6 +27,11 @@ const POOLS = {
     "You crouch and peer at the floor. A trace of something — too faint to call.",
     "You probe corners and lift the obvious things. The find, if any, is small.",
     "You spend a few minutes searching. The world reveals itself only a little.",
+    "You check the seams of the place — where a thing might be hidden, if a thing was hidden.",
+    "You run a finger along a ledge and come away with grit and questions.",
+    "You move with care, looking for what does not match the rest.",
+    "You search slowly. Slowness is its own kind of skill.",
+    "You note what is missing as much as what is present. It is informative.",
   ],
   exploration_move_on: [
     "You press onward.",
@@ -29,6 +39,11 @@ const POOLS = {
     "You shoulder your pack and keep walking.",
     "You take a breath and continue.",
     "You set out for the next stretch.",
+    "You commit your weight forward and the path takes you in.",
+    "You trade this place for the next. Distance is a kind of safety.",
+    "You walk on, the ground crunching softly beneath your boots.",
+    "You leave one silence and step into another.",
+    "You go. There is no good reason to stay.",
   ],
   exploration_rest_briefly: [
     "You sit a moment and let your breathing slow. It is not enough to truly rest, but the edge dulls.",
@@ -36,6 +51,11 @@ const POOLS = {
     "You rest a moment. Time passes; not enough.",
     "You drink a sip of water and steady your hands. Onward soon.",
     "You let yourself rest a half-minute. It is something. Barely.",
+    "You close your eyes briefly. The exhaustion stays, but quiets.",
+    "You stretch a knot from your shoulders and feel the day settle.",
+    "You eat half a strip of dried meat and let it work.",
+    "You catch your breath. The next step will come easier for it.",
+    "You take stock of yourself, body before mind. Both are tired.",
   ],
 
   // ----------------- cheap-resolve: dialog -----------------
@@ -44,16 +64,23 @@ const POOLS = {
     "You ask, voice level.",
     "You ask plainly, leaving no room for evasion.",
     "You frame the question gently, an opening rather than a demand.",
+    "You ask, and let the silence after do half the work.",
+    "You speak the question slowly, giving them room to answer or refuse.",
+    "You put it as a question of fact, not of feeling. Cleaner that way.",
   ],
   dialog_agree: [
     "You nod, agreement enough.",
     "You voice your assent, plain and unadorned.",
     "You agree. The other party seems to relax, slightly.",
+    "You say yes. The word lands and settles.",
+    "You agree without hedging. Sometimes that is the rarer kindness.",
   ],
   dialog_refuse: [
     "You shake your head once, firm. The refusal lands.",
     "You decline. The air grows a touch cooler.",
     "You refuse, careful but unambiguous.",
+    "You say no. You do not soften it.",
+    "You decline, and offer no reason. The reason is yours to keep.",
   ],
 
   // ----------------- combat: defend (cheap-resolve) -----------------
@@ -63,6 +90,9 @@ const POOLS = {
     "You shift your guard up. You will weather what comes.",
     "You plant your feet and ready a deflection.",
     "You raise your guard and breathe out.",
+    "You square your shoulders and watch the line of the threat.",
+    "You centre your weight and let your guard speak before you do.",
+    "You wait, ready, the way a stone waits for water.",
   ],
 
   // ----------------- combat: routine enemy attack (combat-action) -----------------

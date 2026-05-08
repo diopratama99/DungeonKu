@@ -132,13 +132,27 @@ Deno.serve(async (req: Request) => {
   // Static narration.
   const narration = narrate(rule.narrationKey);
 
+  // Build next-turn options from the template_common pool (shuffled so
+  // the player doesn't see the exact same order every time).
+  const pool = TEMPLATE_COMMON_ACTIONS[rule.situation].slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const nextOptions = pool.slice(0, 3).map((a) => ({
+    id: a.id,
+    label: a.label,
+    kind: "template_common" as const,
+    icon: a.icon,
+  }));
+
   // DM message.
   const { data: dmMsg, error: dErr } = await sb.from("messages").insert({
     campaign_id: campaign.id,
     role: "dm",
     content: narration,
     situation_type: rule.situation,
-    options: [],
+    options: nextOptions,
     was_cheap_resolve: true,
     state_changes_applied: stateApplied,
     prompt_tokens: 0,

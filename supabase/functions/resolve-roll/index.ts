@@ -97,6 +97,21 @@ Deno.serve(async (req: Request) => {
     purpose: pending.purpose as string,
   });
 
+  // Insert a player-side chat bubble showing the rolled value so the
+  // chat history reads naturally: "I aim my bow" → DM "Roll d20" →
+  // 🎲 12 → DM narrates outcome. Persisted so it survives a refresh.
+  // Total (raw + modifier) is shown when there's a stat modifier; otherwise
+  // raw is enough to convey the result.
+  const rollBubbleContent = modifier !== 0
+    ? `🎲 ${dice} → ${roll.raw}${modifier >= 0 ? "+" : ""}${modifier} = ${roll.total}`
+    : `🎲 ${dice} → ${roll.raw}`;
+  await sb.from("messages").insert({
+    campaign_id: campaign.id,
+    role: "player",
+    content: rollBubbleContent,
+    was_cheap_resolve: false,
+  });
+
   // ------------------------------ Build LLM call #2 ------------------------------
   const outcomeWord = {
     critical_success: "CRITICAL SUCCESS",

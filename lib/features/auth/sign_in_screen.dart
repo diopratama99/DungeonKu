@@ -39,9 +39,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     try {
       final auth = Supabase.instance.client.auth;
       if (_isSignUp) {
-        await auth.signUp(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+        await auth.signUp(
+            email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
       } else {
-        await auth.signInWithPassword(email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
+        await auth.signInWithPassword(
+            email: _emailCtrl.text.trim(), password: _passwordCtrl.text);
       }
       if (!mounted) return;
       context.go('/characters');
@@ -58,75 +60,120 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PixelColors.inkBackground,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: PixelPanel(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'DUNGEONKU',
-                        textAlign: TextAlign.center,
-                        style: AppTheme.pressStart(18, color: PixelColors.accentGold),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Dimmed ambient backdrop using the loading-screen art.
+          Image.asset(
+            'assets/images/splash/loading_screen.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Image.asset(
+              'assets/images/logo/loading_screen.png',
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) =>
+                  const ColoredBox(color: PixelColors.inkBackground),
+            ),
+          ),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xCC000000), Color(0xEE000000)],
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: PixelPanel(
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Logo crest replaces the plain wordmark.
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 110),
+                            child: Image.asset(
+                              'assets/images/logo/dungeonku_logo.png',
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Text(
+                                'DUNGEONKU',
+                                textAlign: TextAlign.center,
+                                style: AppTheme.pressStart(20,
+                                    color: PixelColors.accentGold),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _isSignUp
+                                ? '\u2756  RAISE A NEW HERO  \u2756'
+                                : '\u2756  RETURN, ADVENTURER  \u2756',
+                            textAlign: TextAlign.center,
+                            style: AppTheme.pressStart(9,
+                                color: PixelColors.textMuted),
+                          ),
+                          const SizedBox(height: 24),
+                          TextFormField(
+                            controller: _emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            autofillHints: const [AutofillHints.email],
+                            style: AppTheme.vt323(20),
+                            decoration: _decoration('Email'),
+                            validator: (v) => (v == null || !v.contains('@'))
+                                ? 'Enter a valid email'
+                                : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _passwordCtrl,
+                            obscureText: true,
+                            style: AppTheme.vt323(20),
+                            decoration: _decoration('Password'),
+                            validator: (v) => (v == null || v.length < 6)
+                                ? '6+ chars please'
+                                : null,
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(_error!,
+                                style: AppTheme.vt323(16,
+                                    color: PixelColors.accentRed)),
+                          ],
+                          const SizedBox(height: 24),
+                          PixelButton(
+                            label: _isSignUp ? 'Create account' : 'Sign in',
+                            fullWidth: true,
+                            onPressed: _busy ? null : _submit,
+                          ),
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: _busy
+                                ? null
+                                : () => setState(() => _isSignUp = !_isSignUp),
+                            child: Text(
+                              _isSignUp
+                                  ? 'Already have an account? Sign in'
+                                  : "Don't have an account? Create one",
+                              style: AppTheme.vt323(16,
+                                  color: PixelColors.textMuted),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _isSignUp ? 'Create an account' : 'Sign in',
-                        textAlign: TextAlign.center,
-                        style: AppTheme.pressStart(10, color: PixelColors.textMuted),
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _emailCtrl,
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        style: AppTheme.vt323(20),
-                        decoration: _decoration('Email'),
-                        validator: (v) =>
-                            (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _passwordCtrl,
-                        obscureText: true,
-                        style: AppTheme.vt323(20),
-                        decoration: _decoration('Password'),
-                        validator: (v) => (v == null || v.length < 6) ? '6+ chars please' : null,
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(_error!, style: AppTheme.vt323(16, color: PixelColors.accentRed)),
-                      ],
-                      const SizedBox(height: 24),
-                      PixelButton(
-                        label: _isSignUp ? 'Create account' : 'Sign in',
-                        fullWidth: true,
-                        onPressed: _busy ? null : _submit,
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: _busy ? null : () => setState(() => _isSignUp = !_isSignUp),
-                        child: Text(
-                          _isSignUp
-                              ? 'Already have an account? Sign in'
-                              : "Don't have an account? Create one",
-                          style: AppTheme.vt323(16, color: PixelColors.textMuted),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

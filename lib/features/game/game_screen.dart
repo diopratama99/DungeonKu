@@ -7,8 +7,9 @@ import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/widgets/pixel_button.dart';
 import 'package:dungeonku/core/widgets/pixel_progress_bar.dart';
 import 'package:dungeonku/data/models/messages.dart';
-import 'package:dungeonku/features/game/components/action_panel.dart';
+import 'package:dungeonku/features/game/components/chat_game_view.dart';
 import 'package:dungeonku/features/game/components/chat_view.dart';
+import 'package:dungeonku/features/game/components/conditional_action_panel.dart';
 import 'package:dungeonku/features/game/components/dice_overlay.dart';
 import 'package:dungeonku/features/game/components/stats_sheet.dart';
 import 'package:dungeonku/features/game/game_providers.dart';
@@ -25,6 +26,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   final _customCtrl = TextEditingController();
   bool _customOpen = false;
   bool _initialised = false;
+  // True while at least one fresh DM/NPC bubble is still typewriter-animating.
+  // We hide the YOUR TURN panel during this so the player isn't prompted
+  // to act while the DM is mid-sentence.
+  bool _dmTyping = false;
 
   @override
   void dispose() {
@@ -47,8 +52,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     ref.listen(gameNotifierProvider, (prev, next) {
       next.whenData((s) {
         if (s.error != null) {
+          ScaffoldMessenger.of(context).removeCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(s.error!, style: AppTheme.vt323(18))),
+            SnackBar(
+              content: Text(s.error!, style: AppTheme.vt323(18)),
+              duration: const Duration(seconds: 6),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: PixelColors.panelBackground,
+              action: SnackBarAction(
+                label: 'RETRY',
+                textColor: PixelColors.accentGold,
+                onPressed: () {
+                  ref.read(gameNotifierProvider.notifier).retry();
+                },
+              ),
+            ),
           );
           ref.read(gameNotifierProvider.notifier).clearError();
         }
@@ -65,7 +83,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       body: SafeArea(
         child: asyncState.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e', style: AppTheme.vt323(18))),
+          error: (e, _) =>
+              Center(child: Text('Error: $e', style: AppTheme.vt323(18))),
           data: (s) => _buildBody(context, s),
         ),
       ),
@@ -73,12 +92,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   Widget _buildBody(BuildContext context, GameState s) {
-    final busy = s.uiMode == GameUiMode.submitting
-        || s.uiMode == GameUiMode.combatSubmitting
-        || s.uiMode == GameUiMode.resolvingRoll;
-    final lockOptions = busy
-        || s.uiMode == GameUiMode.awaitingRoll
-        || s.uiMode == GameUiMode.gameOver;
+    final busy = s.uiMode == GameUiMode.submitting ||
+        s.uiMode == GameUiMode.combatSubmitting ||
+        s.uiMode == GameUiMode.resolvingRoll;
 
     return Stack(
       children: [
@@ -87,12 +103,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             _TopBar(campaignName: s.campaign.name, phase: s.campaign.phase),
             _StatusStrip(character: s.character),
             Expanded(
-              child: ChatView(messages: s.messages, busy: busy),
+              child: ChatGameView(
+                campaign: s.campaign,
+                character: s.character,
+                messages: s.messages,
+                combat: s.combat,
+                busy: busy,
+                onTypewriterActiveChange: (active) {
+                  if (!mounted) return;
+                  if (_dmTyping == active) return;
+                  setState(() => _dmTyping = active);
+                },
+              ),
             ),
-            ActionPanel(
+            ConditionalActionPanel(
+              uiMode: s.uiMode,
               options: s.currentOptions,
-              disabled: lockOptions,
-              onTapOption: (o) => ref.read(gameNotifierProvider.notifier).tapOption(o),
+              requiresRoll: s.requiresRoll,
+              onTapRoll: () =>
+                  ref.read(gameNotifierProvider.notifier).resolvePendingRoll(),
+              suppress: _dmTyping,
+              onTapOption: (o) =>
+                  ref.read(gameNotifierProvider.notifier).tapOption(o),
             ),
             _BottomBar(
               busy: busy,
@@ -102,23 +134,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               onSubmitCustom: (text) {
                 _customCtrl.clear();
                 setState(() => _customOpen = false);
-                ref.read(gameNotifierProvider.notifier).submitPlayerMessage(text);
+                ref
+                    .read(gameNotifierProvider.notifier)
+                    .submitPlayerMessage(text);
               },
               onShowStats: () => _openStatsSheet(context, s),
+              onShowHistory: () => _openHistorySheet(context, s.messages, busy),
             ),
           ],
         ),
-        if (s.uiMode == GameUiMode.awaitingRoll || s.uiMode == GameUiMode.resolvingRoll)
-          if (s.requiresRoll != null)
-            DiceOverlay(
-              requiresRoll: s.requiresRoll!,
-              result: s.lastRollResult,
-              onTapDice: () => ref.read(gameNotifierProvider.notifier).resolvePendingRoll(),
-              onDone: () {
-                // After dice settles, force a state refresh so awaitingRoll mode clears.
-                ref.read(gameNotifierProvider.notifier).clearError();
-              },
-            ),
+        // The dice overlay now appears only AFTER the player taps the Roll
+        // button in the action panel (which transitions us into
+        // resolvingRoll). It auto-starts its tumble animation and stays
+        // mounted until finishRollFlow() clears the state — so the result
+        // face has time to settle before the new DM bubble starts typing.
+        if (s.uiMode == GameUiMode.resolvingRoll && s.requiresRoll != null)
+          DiceOverlay(
+            requiresRoll: s.requiresRoll!,
+            result: s.lastRollResult,
+            autoStart: true,
+            onDone: () =>
+                ref.read(gameNotifierProvider.notifier).finishRollFlow(),
+          ),
       ],
     );
   }
@@ -136,6 +173,35 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       ),
     );
   }
+
+  void _openHistorySheet(
+      BuildContext context, List<GameMessage> messages, bool busy) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: PixelColors.panelBackground,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        builder: (_, controller) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text('STORY LOG',
+                  style:
+                      AppTheme.pressStart(11, color: PixelColors.accentGold)),
+            ),
+            Expanded(
+              child: ChatView(messages: messages, busy: busy),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _TopBar extends StatelessWidget {
@@ -146,22 +212,45 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(4, 6, 12, 6),
       decoration: const BoxDecoration(
         color: PixelColors.panelBackground,
-        border: Border(bottom: BorderSide(color: PixelColors.borderSoft)),
+        border: Border(
+          bottom: BorderSide(color: PixelColors.borderHighlight, width: 2),
+        ),
       ),
       child: Row(
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: PixelColors.accentGold),
+            tooltip: 'Back to campaigns',
             onPressed: () => context.go('/campaigns'),
           ),
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Image.asset(
+              'assets/images/logo/dungeonku_app-icon.png',
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              campaignName.toUpperCase(),
-              overflow: TextOverflow.ellipsis,
-              style: AppTheme.pressStart(11, color: PixelColors.accentGold),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  campaignName.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTheme.pressStart(11, color: PixelColors.accentGold),
+                ),
+                Text(
+                  'CHAPTER · ${phase.toUpperCase()}',
+                  style: AppTheme.pressStart(7, color: PixelColors.textMuted),
+                ),
+              ],
             ),
           ),
           _PhaseProgress(phase: phase),
@@ -185,7 +274,9 @@ class _PhaseProgress extends StatelessWidget {
       children: List.generate(_phases.length, (i) {
         final reached = i <= currentIdx;
         final color = reached
-            ? (i == currentIdx ? PixelColors.accentGold : PixelColors.accentGreen)
+            ? (i == currentIdx
+                ? PixelColors.accentGold
+                : PixelColors.accentGreen)
             : PixelColors.borderSoft;
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -242,6 +333,7 @@ class _BottomBar extends StatelessWidget {
     required this.onToggleCustom,
     required this.onSubmitCustom,
     required this.onShowStats,
+    required this.onShowHistory,
   });
 
   final bool busy;
@@ -250,6 +342,7 @@ class _BottomBar extends StatelessWidget {
   final VoidCallback onToggleCustom;
   final void Function(String) onSubmitCustom;
   final VoidCallback onShowStats;
+  final VoidCallback onShowHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -264,9 +357,16 @@ class _BottomBar extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.bar_chart, color: PixelColors.accentGold),
+                icon:
+                    const Icon(Icons.bar_chart, color: PixelColors.accentGold),
                 tooltip: 'Stats',
                 onPressed: onShowStats,
+              ),
+              IconButton(
+                icon:
+                    const Icon(Icons.menu_book, color: PixelColors.accentGold),
+                tooltip: 'Story log',
+                onPressed: onShowHistory,
               ),
               IconButton(
                 icon: Icon(

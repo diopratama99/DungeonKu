@@ -63,12 +63,22 @@ class AvatarTemplate {
   factory AvatarTemplate.fromJson(Map<String, dynamic> json) => AvatarTemplate(
         id: json['id'] as String,
         displayName: json['display_name'] as String,
-        imageUrl: json['image_url'] as String,
+        imageUrl: _resolveAvatarImageUrl(
+          id: json['id'] as String,
+          imageUrl: json['image_url'] as String,
+        ),
         classFilter: ((json['class_filter'] as List<dynamic>?) ?? const [])
             .map((e) => e as String)
             .toList(growable: false),
         sortOrder: (json['sort_order'] as num? ?? 0).toInt(),
       );
+}
+
+String _resolveAvatarImageUrl({required String id, required String imageUrl}) {
+  if (imageUrl.startsWith('https://placehold.co/')) {
+    return 'assets/images/avatars/$id.png';
+  }
+  return imageUrl;
 }
 
 class Skill {
@@ -110,9 +120,10 @@ class Skill {
         costAmount: (json['cost_amount'] as num? ?? 0).toInt(),
         dice: json['dice'] as String?,
         modifierStat: json['modifier_stat'] as String?,
-        availableToClasses: ((json['available_to_classes'] as List<dynamic>?) ?? const [])
-            .map((e) => e as String)
-            .toList(growable: false),
+        availableToClasses:
+            ((json['available_to_classes'] as List<dynamic>?) ?? const [])
+                .map((e) => e as String)
+                .toList(growable: false),
         requiredLevel: (json['required_level'] as num? ?? 1).toInt(),
         isBasicAttack: json['is_basic_attack'] as bool? ?? false,
       );

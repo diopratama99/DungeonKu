@@ -78,11 +78,25 @@ class _Bubble extends StatelessWidget {
     if (isSystem) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Center(
-          child: Text(message.content, style: AppTheme.vt323(16, color: PixelColors.textMuted)),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Divider(color: PixelColors.borderSoft, thickness: 1),
+            ),
+            const SizedBox(width: 8),
+            Text('\u2756  ${message.content}  \u2756',
+                style: AppTheme.pressStart(7, color: PixelColors.textMuted)),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Divider(color: PixelColors.borderSoft, thickness: 1),
+            ),
+          ],
         ),
       );
     }
+    final speaker = isPlayer ? 'YOU' : 'DUNGEON MASTER';
+    final speakerColor =
+        isPlayer ? PixelColors.textPlayer : PixelColors.accentGold;
     return Align(
       alignment: isPlayer ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -92,16 +106,39 @@ class _Bubble extends StatelessWidget {
             left: isPlayer ? 40 : 0,
             right: isPlayer ? 0 : 40,
           ),
-          child: PixelPanel(
-            color: isPlayer ? PixelColors.panelInner : PixelColors.parchment,
-            borderColor: isPlayer ? PixelColors.borderSoft : PixelColors.borderHighlight,
-            innerBorderColor: isPlayer ? PixelColors.borderSoft : PixelColors.parchmentDark,
-            child: Text(
-              message.content,
-              style: isPlayer
-                  ? AppTheme.vt323(20, color: PixelColors.textPlayer)
-                  : AppTheme.vt323(20, color: PixelColors.textOnParchment),
-            ),
+          child: Column(
+            crossAxisAlignment:
+                isPlayer ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 4, right: 4, bottom: 2),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(width: 6, height: 6, color: speakerColor),
+                    const SizedBox(width: 6),
+                    Text(speaker,
+                        style: AppTheme.pressStart(8, color: speakerColor)),
+                  ],
+                ),
+              ),
+              PixelPanel(
+                color:
+                    isPlayer ? PixelColors.panelInner : PixelColors.parchment,
+                borderColor: isPlayer
+                    ? PixelColors.borderSoft
+                    : PixelColors.borderHighlight,
+                innerBorderColor: isPlayer
+                    ? PixelColors.borderSoft
+                    : PixelColors.parchmentDark,
+                child: Text(
+                  message.content,
+                  style: isPlayer
+                      ? AppTheme.vt323(20, color: PixelColors.textPlayer)
+                      : AppTheme.vt323(20, color: PixelColors.textOnParchment),
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -6,14 +6,15 @@ import 'package:dungeonku/data/supabase_providers.dart';
 
 class CharactersRepository {
   CharactersRepository(this._sb);
-  final SupabaseClient _sb;
+  final SupabaseQuerySchema _sb;
 
   Future<List<Character>> list(String userId) async {
     final rows = await _sb
         .from('characters')
         .select()
         .eq('user_id', userId)
-        .order('created_at');
+        // Newest character at the top of the roster.
+        .order('created_at', ascending: false);
     return (rows as List<dynamic>)
         .map((r) => Character.fromJson(r as Map<String, dynamic>))
         .toList(growable: false);
@@ -43,7 +44,9 @@ class CharactersRepository {
   }
 
   Future<void> rename(String characterId, String newName) async {
-    await _sb.from('characters').update({'name': newName}).eq('id', characterId);
+    await _sb
+        .from('characters')
+        .update({'name': newName}).eq('id', characterId);
   }
 
   Future<void> delete(String characterId) async {
@@ -64,7 +67,7 @@ class CharactersRepository {
 }
 
 final charactersRepositoryProvider = Provider<CharactersRepository>((ref) {
-  return CharactersRepository(ref.watch(supabaseClientProvider));
+  return CharactersRepository(ref.watch(dbProvider));
 });
 
 /// Watches the current user's character roster. Refreshes on character mutations via

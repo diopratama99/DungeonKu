@@ -31,11 +31,16 @@ class _PixelButtonState extends State<PixelButton> {
 
   Color get _accent {
     switch (widget.tone) {
-      case PixelButtonTone.gold:    return PixelColors.accentGold;
-      case PixelButtonTone.neutral: return PixelColors.borderSoft;
-      case PixelButtonTone.danger:  return PixelColors.accentRed;
-      case PixelButtonTone.blue:    return PixelColors.accentBlue;
-      case PixelButtonTone.green:   return PixelColors.accentGreen;
+      case PixelButtonTone.gold:
+        return PixelColors.accentGold;
+      case PixelButtonTone.neutral:
+        return PixelColors.borderSoft;
+      case PixelButtonTone.danger:
+        return PixelColors.accentRed;
+      case PixelButtonTone.blue:
+        return PixelColors.accentBlue;
+      case PixelButtonTone.green:
+        return PixelColors.accentGreen;
     }
   }
 
@@ -43,7 +48,12 @@ class _PixelButtonState extends State<PixelButton> {
   Widget build(BuildContext context) {
     final disabled = widget.onPressed == null;
     final accent = disabled ? PixelColors.borderSoft : _accent;
-    final shift = _pressed ? 2.0 : 0.0;
+    // Single-layer chunky button. The previous version stacked an outer
+    // black-bg container around the gold-bordered cell which read as a
+    // distracting black halo on dark panels — especially when the button
+    // was full-width. We keep the retro depth via a 2px offset drop-shadow
+    // and a tiny press translation, all on one container.
+    final offset = _pressed ? 0.0 : 2.0;
 
     return GestureDetector(
       onTapDown: disabled ? null : (_) => setState(() => _pressed = true),
@@ -53,46 +63,49 @@ class _PixelButtonState extends State<PixelButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 60),
         width: widget.fullWidth ? double.infinity : null,
-        padding: EdgeInsets.fromLTRB(14, 10 + shift, 14, 10 - shift),
+        transform:
+            Matrix4.translationValues(_pressed ? 1 : 0, _pressed ? 1 : 0, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: PixelColors.borderOuter,
+          color: disabled
+              ? PixelColors.panelInner.withValues(alpha: 0.5)
+              : PixelColors.panelInner,
           border: Border.all(color: accent, width: 2),
-          boxShadow: _pressed || disabled
+          boxShadow: disabled
               ? const []
-              : const [
+              : [
                   BoxShadow(
-                    color: PixelColors.borderOuter,
-                    offset: Offset(2, 2),
+                    color: accent.withValues(alpha: 0.55),
+                    offset: Offset(offset, offset),
                   ),
                 ],
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: disabled ? PixelColors.panelInner.withValues(alpha: 0.5) : PixelColors.panelInner,
-            border: Border.all(color: PixelColors.borderSoft, width: 1),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          child: Row(
-            mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (widget.icon != null) ...[
-                Icon(widget.icon, color: accent, size: 14),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Text(
-                  widget.label,
-                  style: AppTheme.pressStart(
-                    10,
-                    color: disabled ? PixelColors.textMuted : accent,
-                  ),
-                  textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+        child: Row(
+          mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (widget.icon != null) ...[
+              Icon(widget.icon, color: accent, size: 14),
+              const SizedBox(width: 8),
             ],
-          ),
+            Flexible(
+              child: Text(
+                widget.label,
+                style: AppTheme.pressStart(
+                  10,
+                  color: disabled ? PixelColors.textMuted : accent,
+                ),
+                textAlign: TextAlign.center,
+                // Allow wrap up to 3 lines so long action labels like
+                // "Follow the scuff marks toward the cellar door" stay
+                // readable. Ellipsis only kicks in past line 3 — a safety
+                // net for absurdly long LLM output.
+                maxLines: 3,
+                softWrap: true,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

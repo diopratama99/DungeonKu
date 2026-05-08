@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:dungeonku/core/widgets/main_shell.dart';
 import 'package:dungeonku/data/supabase_providers.dart';
 import 'package:dungeonku/features/auth/sign_in_screen.dart';
 import 'package:dungeonku/features/auth/splash_screen.dart';
@@ -9,6 +10,7 @@ import 'package:dungeonku/features/campaigns/campaigns_screen.dart';
 import 'package:dungeonku/features/campaigns/template_picker_screen.dart';
 import 'package:dungeonku/features/characters/character_creation_screen.dart';
 import 'package:dungeonku/features/characters/characters_screen.dart';
+import 'package:dungeonku/features/codex/codex_screen.dart';
 import 'package:dungeonku/features/game/game_screen.dart';
 import 'package:dungeonku/features/game_over/game_over_screen.dart';
 import 'package:dungeonku/features/settings/settings_screen.dart';
@@ -36,13 +38,37 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/sign-in', builder: (_, __) => const SignInScreen()),
-      GoRoute(
-          path: '/characters', builder: (_, __) => const CharactersScreen()),
+
+      // Primary tabs share a persistent bottom nav via [MainShell].
+      ShellRoute(
+        builder: (ctx, state, child) =>
+            MainShell(location: state.matchedLocation, child: child),
+        routes: [
+          GoRoute(
+            path: '/characters',
+            builder: (_, __) => const CharactersScreen(),
+          ),
+          GoRoute(
+            path: '/campaigns',
+            builder: (_, __) => const CampaignsScreen(),
+          ),
+          GoRoute(
+            path: '/codex',
+            builder: (_, __) => const CodexScreen(),
+          ),
+          GoRoute(
+            path: '/settings',
+            builder: (_, __) => const SettingsScreen(),
+          ),
+        ],
+      ),
+
+      // Full-screen flows live outside the shell so they take the whole
+      // viewport (no bottom nav distractions during creation / play).
       GoRoute(
         path: '/characters/new',
         builder: (_, __) => const CharacterCreationScreen(),
       ),
-      GoRoute(path: '/campaigns', builder: (_, __) => const CampaignsScreen()),
       GoRoute(
         path: '/campaigns/new',
         builder: (_, state) {
@@ -60,7 +86,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) =>
             GameOverScreen(campaignId: state.pathParameters['campaignId']!),
       ),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
     ],
   );
 });

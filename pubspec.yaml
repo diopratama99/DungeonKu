@@ -30,6 +30,7 @@ dependencies:
   intl: ^0.19.0
   collection: ^1.18.0
   uuid: ^4.4.0
+  http: ^1.2.0   # used by NgrokSkipClient wrapper
 
 dev_dependencies:
   flutter_test:
@@ -44,3 +45,21 @@ flutter:
   uses-material-design: true
   assets:
     - supabase.json
+    - assets/images/logo/
+    - assets/images/avatars/
+    - assets/images/icons/
+    - assets/images/items/
+    - assets/images/weapons/
+    - assets/images/skills/
+    - assets/images/elements/
+    - assets/images/backgrounds/
+    - assets/images/bosses/
+    - assets/images/monsters/
+    - assets/images/npcs/
+    - assets/images/story-art/
+    - assets/images/campaigns/covers/
+    - assets/images/splash/
+    - assets/audio/bgm/
+    - assets/audio/sfx/
+    # Bundled Google Fonts so the app never has to hit fonts.gstatic.com.
+    - google_fonts/
