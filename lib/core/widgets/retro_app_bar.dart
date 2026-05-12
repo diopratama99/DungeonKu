@@ -34,9 +34,17 @@ class RetroAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    // If the caller didn't pass an explicit leading widget but the
+    // current route has a stack to pop, swap in our pixel-art arrow so
+    // the back button stops reading as Material default. `canPop`
+    // matches Flutter's own implicit-back-button check.
+    final effectiveLeading = leading ??
+        (ModalRoute.of(context)?.canPop == true
+            ? PixelBackButton(onTap: () => Navigator.of(context).maybePop())
+            : null);
     return AppBar(
-      leading: leading,
-      titleSpacing: leading == null ? 16 : 4,
+      leading: effectiveLeading,
+      titleSpacing: effectiveLeading == null ? 16 : 4,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -87,6 +95,42 @@ class _AppBarBackdrop extends StatelessWidget {
             Color(0xFF2A2418),
             Color(0xFF1E1A14),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Pixel-art replacement for the default Material back arrow. Uses the
+/// shared `support_arrow_left.png` so the back affordance matches the
+/// rest of the app's UI icons. Tap target stays at 48×48 (the AppBar
+/// leading slot) for accessibility even though the visible sprite is
+/// 24×24.
+class PixelBackButton extends StatelessWidget {
+  const PixelBackButton({required this.onTap, super.key});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'Back',
+      child: InkWell(
+        onTap: onTap,
+        child: Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: Image.asset(
+              'assets/images/icons/processed/support_arrow_left.png',
+              filterQuality: FilterQuality.none,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.arrow_back,
+                color: PixelColors.accentGold,
+                size: 22,
+              ),
+            ),
+          ),
         ),
       ),
     );

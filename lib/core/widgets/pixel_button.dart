@@ -9,6 +9,7 @@ class PixelButton extends StatefulWidget {
     required this.label,
     required this.onPressed,
     this.icon,
+    this.iconAsset,
     this.tone = PixelButtonTone.gold,
     this.fullWidth = false,
     super.key,
@@ -17,6 +18,12 @@ class PixelButton extends StatefulWidget {
   final String label;
   final VoidCallback? onPressed;
   final IconData? icon;
+
+  /// Optional asset path (e.g. `assets/images/icons/processed/support_eye.png`).
+  /// When provided, the asset is rendered instead of [icon] — used to swap
+  /// in our pixel-art icons while keeping a Material fallback for cases
+  /// where no matching asset exists yet.
+  final String? iconAsset;
   final PixelButtonTone tone;
   final bool fullWidth;
 
@@ -84,7 +91,23 @@ class _PixelButtonState extends State<PixelButton> {
           mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            if (widget.icon != null) ...[
+            if (widget.iconAsset != null) ...[
+              // Pixel-art icon: keep the grid sharp with FilterQuality.none
+              // and avoid Image.asset's default smoothing. errorBuilder
+              // falls back to the Material icon (or nothing) if the asset
+              // is missing on this build.
+              Image.asset(
+                widget.iconAsset!,
+                width: 18,
+                height: 18,
+                filterQuality: FilterQuality.none,
+                color: disabled ? accent.withValues(alpha: 0.6) : null,
+                errorBuilder: (_, __, ___) => widget.icon != null
+                    ? Icon(widget.icon, color: accent, size: 14)
+                    : const SizedBox.shrink(),
+              ),
+              const SizedBox(width: 8),
+            ] else if (widget.icon != null) ...[
               Icon(widget.icon, color: accent, size: 14),
               const SizedBox(width: 8),
             ],

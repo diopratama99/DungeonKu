@@ -32,6 +32,9 @@ dependencies:
   uuid: ^4.4.0
   http: ^1.2.0   # used by NgrokSkipClient wrapper
 
+  # Audio (BGM looping + one-shot SFX)
+  just_audio: ^0.9.40
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -48,6 +51,7 @@ flutter:
     - assets/images/logo/
     - assets/images/avatars/
     - assets/images/icons/
+    - assets/images/icons/processed/
     - assets/images/items/
     - assets/images/weapons/
     - assets/images/skills/

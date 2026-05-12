@@ -19,6 +19,16 @@ export const ENV = {
 
   // App secrets.
   OPENAI_API_KEY: () => required("OPENAI_API_KEY"),
-  OPENAI_MODEL: () => optional("OPENAI_MODEL", "gpt-4o"),
-  OPENAI_MODEL_SUMMARY: () => optional("OPENAI_MODEL_SUMMARY", "gpt-4o-mini"),
+  OPENAI_BASE_URL: () => optional("OPENAI_BASE_URL", ""),
+  // Support both naming conventions: OPENAI_CHAT_MODEL (your .env) and OPENAI_MODEL (legacy)
+  OPENAI_MODEL: () =>
+    Deno.env.get("OPENAI_CHAT_MODEL") ??
+    Deno.env.get("OPENAI_MODEL") ??
+    "gpt-4o",
+  // For lighter tasks (intent mapping, narration, reskin). Falls back to chat model if not set.
+  OPENAI_MODEL_SUMMARY: () =>
+    Deno.env.get("OPENAI_MODEL_SUMMARY") ??
+    Deno.env.get("OPENAI_CHAT_MODEL") ??
+    Deno.env.get("OPENAI_MODEL") ??
+    "gpt-4o-mini",
 };

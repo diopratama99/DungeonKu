@@ -49,6 +49,12 @@ class AvatarTemplate {
     required this.imageUrl,
     required this.classFilter,
     required this.sortOrder,
+    this.backstory,
+    this.personalityTags = const [],
+    this.storyHooks = const [],
+    this.signatureSkillId,
+    this.signatureSkillName,
+    this.signatureSkillDescription,
   });
 
   final String id;
@@ -57,21 +63,75 @@ class AvatarTemplate {
   final List<String> classFilter;
   final int sortOrder;
 
+  /// 1-2 sentence origin shown on the avatar detail card and surfaced
+  /// to the DM as flavor.
+  final String? backstory;
+
+  /// 3-4 trait keywords (e.g. ["stoic", "weary"]). Used as voice cues
+  /// for the LLM and as small chips in the picker UI.
+  final List<String> personalityTags;
+
+  /// 2-3 narrative seeds the DM can pull on at any point during the
+  /// campaign (e.g. "An old comrade surfaces in the city").
+  final List<String> storyHooks;
+
+  /// FK -> skills.id. The avatar's unique signature ability, auto-
+  /// granted as a real skill on campaign start. Nullable so legacy
+  /// rows without lore don't crash the model.
+  final String? signatureSkillId;
+
+  /// Populated when the row is fetched with a `skills(name, description)`
+  /// join. Cheap to skip on bulk listings, present on the picker.
+  final String? signatureSkillName;
+  final String? signatureSkillDescription;
+
   bool fitsClass(String classId) =>
       classFilter.isEmpty || classFilter.contains(classId);
 
-  factory AvatarTemplate.fromJson(Map<String, dynamic> json) => AvatarTemplate(
+  /// Whether the avatar has any lore content wired up. Used by UI to
+  /// decide whether to render the lore card at all (avoiding an empty
+  /// frame for rows seeded before migration 20260510).
+  bool get hasLore =>
+      (backstory != null && backstory!.isNotEmpty) ||
+      personalityTags.isNotEmpty ||
+      storyHooks.isNotEmpty ||
+      signatureSkillId != null;
+
+  factory AvatarTemplate.fromJson(Map<String, dynamic> json) {
+    // The signature skill comes through as a nested object when the
+    // caller selected `skills(name, description)`, or as just a foreign
+    // key string when the bulk endpoint didn't ask for the join.
+    final sig = json['skills'];
+    String? sigName;
+    String? sigDesc;
+    if (sig is Map<String, dynamic>) {
+      sigName = sig['name'] as String?;
+      sigDesc = sig['description'] as String?;
+    }
+    return AvatarTemplate(
+      id: json['id'] as String,
+      displayName: json['display_name'] as String,
+      imageUrl: _resolveAvatarImageUrl(
         id: json['id'] as String,
-        displayName: json['display_name'] as String,
-        imageUrl: _resolveAvatarImageUrl(
-          id: json['id'] as String,
-          imageUrl: json['image_url'] as String,
-        ),
-        classFilter: ((json['class_filter'] as List<dynamic>?) ?? const [])
-            .map((e) => e as String)
-            .toList(growable: false),
-        sortOrder: (json['sort_order'] as num? ?? 0).toInt(),
-      );
+        imageUrl: json['image_url'] as String,
+      ),
+      classFilter: ((json['class_filter'] as List<dynamic>?) ?? const [])
+          .map((e) => e as String)
+          .toList(growable: false),
+      sortOrder: (json['sort_order'] as num? ?? 0).toInt(),
+      backstory: json['backstory'] as String?,
+      personalityTags:
+          ((json['personality_tags'] as List<dynamic>?) ?? const [])
+              .map((e) => e as String)
+              .toList(growable: false),
+      storyHooks: ((json['story_hooks'] as List<dynamic>?) ?? const [])
+          .map((e) => e as String)
+          .toList(growable: false),
+      signatureSkillId: json['signature_skill_id'] as String?,
+      signatureSkillName: sigName,
+      signatureSkillDescription: sigDesc,
+    );
+  }
 }
 
 String _resolveAvatarImageUrl({required String id, required String imageUrl}) {

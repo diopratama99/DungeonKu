@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
@@ -18,6 +17,7 @@ class CodexDetailScreen extends StatefulWidget {
     required this.accent,
     required this.sections,
     this.heroBackgroundAsset,
+    this.imageCaptions,
     super.key,
   });
 
@@ -27,6 +27,14 @@ class CodexDetailScreen extends StatefulWidget {
   final Color accent;
   final List<CodexSection> sections;
   final String? heroBackgroundAsset;
+
+  /// Optional per-image caption (e.g. the avatar's display name for a
+  /// class detail page). When present and the carousel has >1 slides,
+  /// the caption for the selected slide is rendered under the dot
+  /// indicator so the player always knows which avatar they're looking
+  /// at. Length should match [imageAssets]; out-of-range indices fall
+  /// back to no caption.
+  final List<String>? imageCaptions;
 
   @override
   State<CodexDetailScreen> createState() => _CodexDetailScreenState();
@@ -53,10 +61,6 @@ class _CodexDetailScreenState extends State<CodexDetailScreen> {
     return Scaffold(
       appBar: RetroAppBar(
         title: widget.title.toUpperCase(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -77,6 +81,15 @@ class _CodexDetailScreenState extends State<CodexDetailScreen> {
               accent: widget.accent,
             ),
           ],
+          if (widget.imageCaptions != null &&
+              _selected < widget.imageCaptions!.length) ...[
+            const SizedBox(height: 8),
+            Text(
+              widget.imageCaptions![_selected].toUpperCase(),
+              textAlign: TextAlign.center,
+              style: AppTheme.pressStart(10, color: widget.accent),
+            ),
+          ],
           const SizedBox(height: 16),
           PixelPanel(
             child: Column(
@@ -86,8 +99,8 @@ class _CodexDetailScreenState extends State<CodexDetailScreen> {
                     style: AppTheme.pressStart(14, color: widget.accent)),
                 const SizedBox(height: 6),
                 Text(widget.subtitle,
-                    style: AppTheme.pressStart(8,
-                        color: PixelColors.textMuted)),
+                    style:
+                        AppTheme.pressStart(8, color: PixelColors.textMuted)),
               ],
             ),
           ),
@@ -147,15 +160,13 @@ class _SectionPanel extends StatelessWidget {
           const SizedBox(height: 10),
           if (section.body != null)
             Text(section.body!,
-                style: AppTheme.vt323(18,
-                    color: PixelColors.textOnInk)),
+                style: AppTheme.vt323(18, color: PixelColors.textOnInk)),
           if (section.bullets != null) ...[
             for (final b in section.bullets!)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text('\u2022  $b',
-                    style: AppTheme.vt323(18,
-                        color: PixelColors.textOnInk)),
+                    style: AppTheme.vt323(18, color: PixelColors.textOnInk)),
               ),
           ],
           if (section.pills != null) ...[
@@ -166,8 +177,8 @@ class _SectionPanel extends StatelessWidget {
               children: [
                 for (final p in section.pills!)
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: PixelColors.panelInner,
                       border: Border.all(color: p.tone, width: 1),
@@ -219,8 +230,7 @@ class _HeroFrame extends StatelessWidget {
                 opacity: 0.18,
                 child: Image.asset(backgroundAsset!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        const SizedBox.shrink()),
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
               ),
             PageView.builder(
               controller: controller,

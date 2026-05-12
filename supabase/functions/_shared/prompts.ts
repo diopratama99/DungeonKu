@@ -67,6 +67,35 @@ export function buildSystemPrompt(opts: BuildPromptOptions): string {
   const stats = ctx.characterSheet.current_stats;
   const statBlock = `STR ${stats.STR}, DEX ${stats.DEX}, CON ${stats.CON}, INT ${stats.INT}, WIS ${stats.WIS}, CHA ${stats.CHA}`;
 
+  // Avatar flavor block — backstory, voice tags, story hooks, signature
+  // ability. Each piece is independently optional. The signature skill
+  // is also already in ctx.skills (it was granted at campaign start),
+  // but mentioning it again here as the avatar's unique calling card
+  // helps the LLM lean into it narratively rather than treating it as
+  // just-another-skill.
+  const flavor = ctx.avatarFlavor;
+  const flavorLines: string[] = [];
+  if (flavor) {
+    if (flavor.backstory) {
+      flavorLines.push(`  Origin (${flavor.display_name}): ${flavor.backstory}`);
+    }
+    if (flavor.personality_tags.length > 0) {
+      flavorLines.push(`  Voice tags: ${flavor.personality_tags.join(", ")}`);
+    }
+    if (flavor.story_hooks.length > 0) {
+      flavorLines.push(`  Story hooks (DM may pull on; not all need to fire):`);
+      for (const h of flavor.story_hooks) {
+        flavorLines.push(`    - ${h}`);
+      }
+    }
+    if (flavor.signature_skill) {
+      flavorLines.push(
+        `  Signature ability: ${flavor.signature_skill.name} — ${flavor.signature_skill.description}`,
+      );
+    }
+  }
+  const flavorBlock = flavorLines.length === 0 ? "" : flavorLines.join("\n");
+
   const phaseBlock = `CURRENT PHASE: ${ctx.campaign.phase} (turns in phase: ${ctx.campaign.turns_in_current_phase})
 PHASE GUIDANCE: ${phaseGuidance(ctx.campaign.phase)}`;
 
@@ -102,6 +131,7 @@ PHASE GUIDANCE: ${phaseGuidance(ctx.campaign.phase)}`;
     `  ${ctx.characterSheet.resource_type.toUpperCase()} ${ctx.characterSheet.resource_current}/${ctx.characterSheet.resource_max}`,
     `  Stats: ${statBlock}`,
     `  Status effects:\n${statusEffectLines}`,
+    flavorBlock,
     `  Inventory:\n${inventoryLines}`,
     `  Skills:\n${skillLines}`,
     "",

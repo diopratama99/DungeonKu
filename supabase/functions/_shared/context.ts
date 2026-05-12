@@ -85,6 +85,18 @@ export interface CampaignContext {
     current_actor_index: number;
     turn_order: unknown;
   } | null;
+  /**
+   * Narrative flavor pulled from the chosen avatar_template. Used by the
+   * DM prompt as voice cues + optional story hooks. Nullable for legacy
+   * rows that pre-date migration 20260510 (no lore wired).
+   */
+  avatarFlavor: {
+    display_name: string;
+    backstory: string | null;
+    personality_tags: string[];
+    story_hooks: string[];
+    signature_skill: { name: string; description: string } | null;
+  } | null;
 }
 
 export async function loadCampaignContext(
@@ -127,15 +139,25 @@ export async function loadCampaignContext(
 
   const campaign = campaignRes.data;
   const camChar = campaignCharRes.data;
+  const avatarId = (camChar.characters as { avatar_id?: string } | null)?.avatar_id ?? null;
 
-  // Fetch template + skills catalog in parallel — depend on campaign.template_id and the
-  // campaign_skills slug list respectively.
+  // Fetch template + skills catalog + avatar flavor in parallel — they
+  // all depend on already-loaded data but not on each other.
   const skillIds = (campaignSkillsRes.data ?? []).map((r: { skill_id: string }) => r.skill_id);
-  const [templateRes, skillsRes] = await Promise.all([
+  const [templateRes, skillsRes, avatarRes] = await Promise.all([
     sb.from("story_templates").select("*").eq("id", campaign.template_id).maybeSingle(),
     skillIds.length === 0
       ? Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null })
       : sb.from("skills").select("*").in("id", skillIds),
+    avatarId === null
+      ? Promise.resolve({ data: null, error: null })
+      : sb
+          .from("avatar_templates")
+          .select(
+            "id, display_name, backstory, personality_tags, story_hooks, signature_skill_id, skills:signature_skill_id(name, description)",
+          )
+          .eq("id", avatarId)
+          .maybeSingle(),
   ]);
 
   if (templateRes.error || !templateRes.data) {
@@ -146,6 +168,35 @@ export async function loadCampaignContext(
 
   // Reverse messages so they're in chronological order for the LLM.
   const recentMessages = [...(messagesRes.data ?? [])].reverse();
+
+  // Shape avatar flavor (nullable cascade: row → fields → signature).
+  const avatarRow = avatarRes.data as
+    | {
+        display_name?: string;
+        backstory?: string | null;
+        personality_tags?: unknown;
+        story_hooks?: unknown;
+        skills?: { name?: string; description?: string } | null;
+      }
+    | null;
+  const avatarFlavor = avatarRow
+    ? {
+        display_name: avatarRow.display_name ?? "",
+        backstory: avatarRow.backstory ?? null,
+        personality_tags: Array.isArray(avatarRow.personality_tags)
+          ? (avatarRow.personality_tags as unknown[]).map((t) => String(t))
+          : [],
+        story_hooks: Array.isArray(avatarRow.story_hooks)
+          ? (avatarRow.story_hooks as unknown[]).map((t) => String(t))
+          : [],
+        signature_skill: avatarRow.skills && avatarRow.skills.name
+          ? {
+              name: avatarRow.skills.name,
+              description: avatarRow.skills.description ?? "",
+            }
+          : null,
+      }
+    : null;
 
   return {
     campaign: {
@@ -235,5 +286,6 @@ export async function loadCampaignContext(
           turn_order: combatRes.data.turn_order,
         }
       : null,
+    avatarFlavor,
   };
 }

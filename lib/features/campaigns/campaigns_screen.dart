@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:dungeonku/core/audio/bgm_manager.dart';
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/widgets/asset_or_network_image.dart';
+import 'package:dungeonku/core/widgets/icon_only_button.dart';
+import 'package:dungeonku/core/widgets/ornate_frame.dart';
 import 'package:dungeonku/core/widgets/pixel_button.dart';
 import 'package:dungeonku/core/widgets/pixel_panel.dart';
 import 'package:dungeonku/core/widgets/retro_app_bar.dart';
@@ -20,12 +23,18 @@ class CampaignsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Restart the menu BGM if we landed here from a non-menu surface
+    // (e.g. via a deep link / pop from gameplay). Idempotent.
+    ref.read(bgmManagerProvider).playMenu();
     final campaignsAsync = ref.watch(campaignsListProvider);
     final charactersAsync = ref.watch(charactersListProvider);
     final templatesAsync = ref.watch(storyTemplatesProvider);
 
     return Scaffold(
-      appBar: const RetroAppBar(title: 'TOME OF DEEDS'),
+      appBar: RetroAppBar(
+        title: 'TOME OF DEEDS',
+        leading: PixelBackButton(onTap: () => context.go('/home')),
+      ),
       body: campaignsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
@@ -149,6 +158,7 @@ class _EmptyCampaignsState extends StatelessWidget {
                   builder: (ctx) => PixelButton(
                     label: 'Pick a hero',
                     icon: Icons.person,
+                    iconAsset: 'assets/images/icons/processed/ui_profile.png',
                     onPressed: () => ctx.go('/characters'),
                   ),
                 ),
@@ -188,103 +198,133 @@ class _CampaignCard extends ConsumerWidget {
     final cover = coverImageUrl;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: PixelPanel(
-        padding: EdgeInsets.zero,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (cover != null && cover.isNotEmpty)
-              SizedBox(
-                width: 96,
-                child: AssetOrNetworkImage(imageUrl: cover, fit: BoxFit.cover),
-              ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: OrnateFrame(
+        cornerSize: 8,
+        inset: 4,
+        child: PixelPanel(
+          padding: EdgeInsets.zero,
+          // IntrinsicHeight resolves the unbounded height the ListView
+          // would otherwise hand down — without it, the Row's
+          // CrossAxisAlignment.stretch throws "infinite height" because
+          // no ancestor pins the cross axis. Net result: the cover image
+          // now fills exactly the text column's natural height.
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (cover != null && cover.isNotEmpty)
+                  SizedBox(
+                    width: 96,
+                    child:
+                        AssetOrNetworkImage(imageUrl: cover, fit: BoxFit.cover),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
-                            campaign.name.toUpperCase(),
-                            style: AppTheme.pressStart(12,
-                                color: PixelColors.accentGold),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        _PhaseBadge(phase: campaign.phase),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$characterName · ${campaign.totalTurns} turns · ${dateFmt.format(campaign.lastPlayedAt)}',
-                      style: AppTheme.vt323(16, color: PixelColors.textMuted),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        if (campaign.status == 'active')
-                          PixelButton(
-                            label: 'Resume',
-                            icon: Icons.play_arrow,
-                            onPressed: () => context.go('/game/${campaign.id}'),
-                          )
-                        else if (campaign.status == 'failed')
-                          PixelButton(
-                            label: 'View',
-                            icon: Icons.visibility,
-                            onPressed: () =>
-                                context.go('/game-over/${campaign.id}'),
-                          ),
-                        const SizedBox(width: 8),
-                        PixelButton(
-                          label: 'Delete',
-                          tone: PixelButtonTone.danger,
-                          icon: Icons.delete,
-                          onPressed: () async {
-                            final confirmed = await showDialog<bool>(
-                              context: context,
-                              builder: (dctx) => AlertDialog(
-                                backgroundColor: PixelColors.panelBackground,
-                                title: Text('Delete this run?',
-                                    style: AppTheme.pressStart(12)),
-                                content: Text(
-                                    'Permanently delete "${campaign.name}"? This cannot be undone.',
-                                    style: AppTheme.vt323(18)),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dctx).pop(false),
-                                    child: Text('Cancel',
-                                        style: AppTheme.pressStart(10)),
-                                  ),
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.of(dctx).pop(true),
-                                    child: Text('Delete',
-                                        style: AppTheme.pressStart(10,
-                                            color: PixelColors.accentRed)),
-                                  ),
-                                ],
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                campaign.name.toUpperCase(),
+                                style: AppTheme.pressStart(12,
+                                    color: PixelColors.accentGold),
+                                overflow: TextOverflow.ellipsis,
                               ),
-                            );
-                            if (confirmed != true) return;
-                            await ref
-                                .read(campaignsRepositoryProvider)
-                                .delete(campaign.id);
-                            ref.invalidate(campaignsListProvider);
-                          },
+                            ),
+                            _PhaseBadge(phase: campaign.phase),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '$characterName · ${campaign.totalTurns} turns · ${dateFmt.format(campaign.lastPlayedAt)}',
+                          style:
+                              AppTheme.vt323(16, color: PixelColors.textMuted),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            if (campaign.status == 'active')
+                              Expanded(
+                                child: PixelButton(
+                                  label: 'Resume',
+                                  icon: Icons.play_arrow,
+                                  iconAsset:
+                                      'assets/images/icons/processed/ui_play.png',
+                                  fullWidth: true,
+                                  onPressed: () =>
+                                      context.go('/game/${campaign.id}'),
+                                ),
+                              )
+                            else if (campaign.status == 'failed')
+                              Expanded(
+                                child: PixelButton(
+                                  label: 'View',
+                                  icon: Icons.visibility,
+                                  fullWidth: true,
+                                  onPressed: () =>
+                                      context.go('/game-over/${campaign.id}'),
+                                ),
+                              ),
+                            const SizedBox(width: 8),
+                            // Icon-only delete keeps the row compact so the
+                            // Resume label fits on a single line. Tooltip
+                            // makes the affordance discoverable for users
+                            // who don't immediately recognise the trash.
+                            IconOnlyButton(
+                              iconAsset:
+                                  'assets/images/icons/processed/ui_delete.png',
+                              tooltip: 'Delete',
+                              fallbackIcon: Icons.delete,
+                              tone: PixelColors.accentRed,
+                              size: 40,
+                              onTap: () async {
+                                final confirmed = await showDialog<bool>(
+                                  context: context,
+                                  builder: (dctx) => AlertDialog(
+                                    backgroundColor:
+                                        PixelColors.panelBackground,
+                                    title: Text('Delete this run?',
+                                        style: AppTheme.pressStart(12)),
+                                    content: Text(
+                                        'Permanently delete "${campaign.name}"? This cannot be undone.',
+                                        style: AppTheme.vt323(18)),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dctx).pop(false),
+                                        child: Text('Cancel',
+                                            style: AppTheme.pressStart(10)),
+                                      ),
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dctx).pop(true),
+                                        child: Text('Delete',
+                                            style: AppTheme.pressStart(10,
+                                                color: PixelColors.accentRed)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirmed != true) return;
+                                await ref
+                                    .read(campaignsRepositoryProvider)
+                                    .delete(campaign.id);
+                                ref.invalidate(campaignsListProvider);
+                              },
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

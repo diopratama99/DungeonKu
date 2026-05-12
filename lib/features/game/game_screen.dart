@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dungeonku/core/audio/bgm_manager.dart';
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/widgets/pixel_button.dart';
 import 'package:dungeonku/core/widgets/pixel_progress_bar.dart';
+import 'package:dungeonku/core/widgets/retro_app_bar.dart';
 import 'package:dungeonku/data/models/messages.dart';
 import 'package:dungeonku/features/game/components/chat_game_view.dart';
 import 'package:dungeonku/features/game/components/chat_view.dart';
@@ -48,9 +50,18 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     final asyncState = ref.watch(gameNotifierProvider);
 
-    // Side-effect listener: surface errors as snack bars; route on game over.
+    // Side-effect listener: surface errors as snack bars; route on game
+    // over; pick the right BGM track for the current scene.
     ref.listen(gameNotifierProvider, (prev, next) {
       next.whenData((s) {
+        // Match BGM intensity to whether combat is currently active. The
+        // intense flag is sticky on `combat != null` so even mid-fight
+        // submitting/idle micro-transitions don't briefly flip back to
+        // the exploration loop.
+        ref.read(bgmManagerProvider).playForGame(
+              templateId: s.campaign.templateId,
+              inIntenseCombat: s.combat != null,
+            );
         if (s.error != null) {
           ScaffoldMessenger.of(context).removeCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
@@ -221,11 +232,7 @@ class _TopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: PixelColors.accentGold),
-            tooltip: 'Back to campaigns',
-            onPressed: () => context.go('/campaigns'),
-          ),
+          PixelBackButton(onTap: () => context.go('/campaigns')),
           SizedBox(
             width: 24,
             height: 24,

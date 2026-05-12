@@ -63,7 +63,11 @@ let cached: OpenAI | null = null;
 
 export function getOpenAI(): OpenAI {
   if (cached) return cached;
-  cached = new OpenAI({ apiKey: ENV.OPENAI_API_KEY() });
+  const baseURL = ENV.OPENAI_BASE_URL();
+  cached = new OpenAI({
+    apiKey: ENV.OPENAI_API_KEY(),
+    ...(baseURL ? { baseURL } : {}),
+  });
   return cached;
 }
 
@@ -114,13 +118,18 @@ export async function callStructured<T>(params: StructuredCallParams): Promise<S
   ];
 
   type ChatCompletion = OpenAI.Chat.Completions.ChatCompletion;
+  
+  // Some providers (Gemini via routers) don't support response_format.
+  // Only include it for models that are known to support it.
+  const supportsJsonMode = model.startsWith("gpt-") || model.includes("openai");
+  
   const completion = await callWithRetry<ChatCompletion>("callStructured", () =>
     client.chat.completions.create({
       model,
       messages: augmentedMessages,
       max_tokens: params.maxTokens,
       temperature: params.temperature ?? 0.7,
-      response_format: { type: "json_object" },
+      ...(supportsJsonMode ? { response_format: { type: "json_object" } } : {}),
     }) as Promise<ChatCompletion>
   );
 

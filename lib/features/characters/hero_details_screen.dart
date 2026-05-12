@@ -10,6 +10,7 @@ import 'package:dungeonku/core/widgets/element_icon.dart';
 import 'package:dungeonku/core/widgets/pixel_button.dart';
 import 'package:dungeonku/core/widgets/pixel_panel.dart';
 import 'package:dungeonku/core/widgets/retro_app_bar.dart';
+import 'package:dungeonku/core/widgets/skill_icon.dart';
 import 'package:dungeonku/data/models/reference.dart';
 import 'package:dungeonku/data/repositories/characters_repository.dart';
 import 'package:dungeonku/data/repositories/reference_repository.dart';
@@ -102,10 +103,6 @@ class _HeroDetailsScreenState extends ConsumerState<HeroDetailsScreen> {
     return Scaffold(
       appBar: RetroAppBar(
         title: cls.name.toUpperCase(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -164,6 +161,19 @@ class _HeroDetailsScreenState extends ConsumerState<HeroDetailsScreen> {
                   ),
               ],
             ),
+          // Show the chosen avatar's lore + signature ability inline so
+          // the player can read what they're committing to without
+          // hunting for it elsewhere. Hidden until a tile is tapped, and
+          // skipped entirely for legacy rows that have no lore wired.
+          if (_selectedAvatarId != null) ...[
+            const SizedBox(height: 14),
+            _AvatarLoreCard(
+              avatar: avatars.firstWhere(
+                (a) => a.id == _selectedAvatarId,
+                orElse: () => avatars.first,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           _StepLabel(step: isMage ? 3 : 2, total: stepCount, text: 'Name'),
           const SizedBox(height: 8),
@@ -316,14 +326,19 @@ class _AvatarTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          // Avatar display name — kept legible (vt323 reads faster than
+          // tiny press-start) so the player can scan portraits without
+          // tapping each one. Two-line cap with ellipsis handles the
+          // longer names like "The Crimson Lance Captain".
           Text(
-            avatar.displayName.toUpperCase(),
-            maxLines: 1,
+            avatar.displayName,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: AppTheme.pressStart(7,
-                color:
-                    selected ? PixelColors.accentGold : PixelColors.textMuted),
+            style: AppTheme.vt323(
+              14,
+              color: selected ? PixelColors.accentGold : PixelColors.textOnInk,
+            ),
           ),
         ],
       ),
@@ -386,6 +401,159 @@ class _DerivedStatsCard extends StatelessWidget {
             .map((e) =>
                 Text('${e.key} ${e.value}', style: AppTheme.pressStart(10)))
             .toList(growable: false),
+      ),
+    );
+  }
+}
+
+/// Lore + signature-ability preview rendered under the avatar grid when
+/// the player taps a portrait.
+///
+/// All four data sections (backstory / personality / hooks / signature)
+/// are independently optional — if a row was seeded before migration
+/// 20260510 we silently skip the missing pieces instead of showing
+/// empty headers. If *nothing* is wired we collapse to SizedBox.shrink().
+class _AvatarLoreCard extends StatelessWidget {
+  const _AvatarLoreCard({required this.avatar});
+  final AvatarTemplate avatar;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!avatar.hasLore) return const SizedBox.shrink();
+    return PixelPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: display name + tiny "lore" tag so it's clear this is
+          // the chosen portrait's flavor, not the class's.
+          Row(
+            children: [
+              Container(width: 8, height: 8, color: PixelColors.accentGold),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  avatar.displayName.toUpperCase(),
+                  style: AppTheme.pressStart(11, color: PixelColors.accentGold),
+                ),
+              ),
+              Text(
+                'LORE',
+                style: AppTheme.pressStart(8, color: PixelColors.textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (avatar.backstory != null && avatar.backstory!.isNotEmpty) ...[
+            Text(
+              avatar.backstory!,
+              style: AppTheme.vt323(18, color: PixelColors.textOnInk),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (avatar.personalityTags.isNotEmpty) ...[
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final tag in avatar.personalityTags)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: PixelColors.panelInner,
+                      border:
+                          Border.all(color: PixelColors.borderSoft, width: 1),
+                    ),
+                    child: Text(
+                      tag,
+                      style: AppTheme.vt323(15, color: PixelColors.textOnInk),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (avatar.storyHooks.isNotEmpty) ...[
+            Text(
+              'DM MAY PULL ON',
+              style: AppTheme.pressStart(8, color: PixelColors.textMuted),
+            ),
+            const SizedBox(height: 4),
+            for (final hook in avatar.storyHooks)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('•  ',
+                        style:
+                            AppTheme.vt323(18, color: PixelColors.accentGold)),
+                    Expanded(
+                      child: Text(
+                        hook,
+                        style: AppTheme.vt323(17, color: PixelColors.textOnInk),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 10),
+          ],
+          if (avatar.signatureSkillName != null) ...[
+            // Signature ability: visually emphasized as the gameplay
+            // payoff — granted as a real skill at campaign start.
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: PixelColors.panelInner,
+                border: Border.all(color: PixelColors.accentGold, width: 1),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (avatar.signatureSkillId != null) ...[
+                    SkillIcon(
+                      skillId: avatar.signatureSkillId!,
+                      size: 46,
+                      borderColor: PixelColors.accentGold,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.auto_awesome,
+                                color: PixelColors.accentGold, size: 14),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'SIGNATURE — ${avatar.signatureSkillName!.toUpperCase()}',
+                                style: AppTheme.pressStart(9,
+                                    color: PixelColors.accentGold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (avatar.signatureSkillDescription != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            avatar.signatureSkillDescription!,
+                            style: AppTheme.vt323(17,
+                                color: PixelColors.textOnInk),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

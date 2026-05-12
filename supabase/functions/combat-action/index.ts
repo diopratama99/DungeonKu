@@ -166,10 +166,34 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // It must be the player's turn. If not, advance until it is (rare edge case if combat was
-  // interrupted by a non-combat function call).
-  if (turnOrder[currentActorIndex]?.kind !== "player") {
-    return errorResponse(409, "not_player_turn", "It is not the player's turn");
+  // If it is NOT the player's turn (enemy won initiative on the very first round, OR the
+  // encounter state got out of sync), run enemy turns automatically until the player can act.
+  // The old hard-reject (409) was wrong: enemies who win initiative should attack first, not
+  // block the player indefinitely.
+  {
+    let safety2 = 0;
+    while (turnOrder[currentActorIndex]?.kind !== "player" && safety2++ < 32) {
+      const slot = turnOrder[currentActorIndex];
+      if (slot.kind !== "enemy") break;
+      const enemy = enemyById(enemies, slot.id);
+      if (enemy && enemy.hp > 0) {
+        await runEnemyTurn(enemy, char, events);
+        await persistCharChanges(sb, char);
+        if (char.hp <= 0) {
+          // Player killed before landing their first action.
+          await onPlayerDeath(sb, encounter.id, campaign.id, char, enemy, events, log);
+          await writeCombatOutcomeFlag(sb, campaign.id, "lost");
+          log.info("player_defeated_before_first_action", { latency_ms: Date.now() - startedAt });
+          return jsonResponse({
+            kind: "player_defeated", events, encounter_id: encounter.id, round_number: roundNumber,
+            enemies: enemies.map((e) => ({ id: e.id, name: e.name, hp: e.hp, max_hp: e.max_hp, is_boss: e.is_boss, element: e.element })),
+            character: { hp: char.hp, max_hp: char.max_hp, resource_current: char.resource_current, resource_max: char.resource_max, ac: char.ac },
+          });
+        }
+      }
+      currentActorIndex = (currentActorIndex + 1) % turnOrder.length;
+      if (currentActorIndex === 0) roundNumber += 1;
+    }
   }
 
   // ------------------------------ Player action ------------------------------
@@ -177,6 +201,7 @@ Deno.serve(async (req: Request) => {
 
   if (playerActionResult.fled) {
     await closeEncounter(sb, encounter.id, "fled");
+    await writeCombatOutcomeFlag(sb, campaign.id, "fled");
     await consumeDefendingBuffIfPresent(sb, char);
     log.info("player_fled", { latency_ms: Date.now() - startedAt });
     return jsonResponse({ kind: "fled", events, encounter_id: encounter.id });
@@ -189,6 +214,7 @@ Deno.serve(async (req: Request) => {
   const aliveEnemies = () => enemies.filter((e) => e.hp > 0);
   if (aliveEnemies().length === 0) {
     await onVictory(sb, encounter.id, campaign.id, enemies, char, events);
+    await writeCombatOutcomeFlag(sb, campaign.id, "won");
     await consumeDefendingBuffIfPresent(sb, char);
     log.info("victory", { latency_ms: Date.now() - startedAt });
     return jsonResponse({ kind: "victory", events, encounter_id: encounter.id });
@@ -219,6 +245,7 @@ Deno.serve(async (req: Request) => {
     if (char.hp <= 0) {
       // Player defeated.
       await onPlayerDeath(sb, encounter.id, campaign.id, char, enemy, events, log);
+      await writeCombatOutcomeFlag(sb, campaign.id, "lost");
       log.info("player_defeated", { latency_ms: Date.now() - startedAt });
       return jsonResponse({ kind: "player_defeated", events, encounter_id: encounter.id });
     }
@@ -707,6 +734,39 @@ async function closeEncounter(sb: SupabaseClient, encounterId: string, status: "
     status,
     ended_at: new Date().toISOString(),
   }).eq("id", encounterId);
+}
+
+/**
+ * Write combat outcome back into campaign_node_state.flags so subsequent
+ * story-graph edges can gate on combat_won / combat_fled / combat_lost.
+ * No-op for legacy campaigns that have no campaign_node_state row.
+ */
+async function writeCombatOutcomeFlag(
+  sb: SupabaseClient,
+  campaignId: string,
+  outcome: "won" | "lost" | "fled",
+): Promise<void> {
+  const { data } = await sb
+    .from("campaign_node_state")
+    .select("flags")
+    .eq("campaign_id", campaignId)
+    .maybeSingle();
+  if (!data) return; // no story-engine state = legacy campaign
+
+  const current = (data.flags ?? {}) as Record<string, unknown>;
+  await sb.from("campaign_node_state")
+    .update({
+      flags: {
+        ...current,
+        combat_outcome: outcome,
+        combat_won: outcome === "won",
+        combat_lost: outcome === "lost",
+        combat_fled: outcome === "fled",
+        pending_combat_id: null,
+      },
+      updated_at: new Date().toISOString(),
+    })
+    .eq("campaign_id", campaignId);
 }
 
 async function persistEnemyChanges(sb: SupabaseClient, enemies: EnemyRow[]): Promise<void> {

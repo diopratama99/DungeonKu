@@ -32,8 +32,7 @@ class TemplateDetailScreen extends ConsumerStatefulWidget {
       _TemplateDetailScreenState();
 }
 
-class _TemplateDetailScreenState
-    extends ConsumerState<TemplateDetailScreen> {
+class _TemplateDetailScreenState extends ConsumerState<TemplateDetailScreen> {
   final _nameCtrl = TextEditingController();
   bool _busy = false;
   String? _error;
@@ -76,10 +75,6 @@ class _TemplateDetailScreenState
     return Scaffold(
       appBar: RetroAppBar(
         title: t.title.toUpperCase(),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
@@ -151,8 +146,8 @@ class _TemplateDetailScreenState
               Container(width: 8, height: 8, color: PixelColors.accentGold),
               const SizedBox(width: 8),
               Text('NAME THIS RUN  (OPTIONAL)',
-                  style: AppTheme.pressStart(11,
-                      color: PixelColors.accentGold)),
+                  style:
+                      AppTheme.pressStart(11, color: PixelColors.accentGold)),
             ],
           ),
           const SizedBox(height: 8),
@@ -180,6 +175,7 @@ class _TemplateDetailScreenState
           PixelButton(
             label: 'Begin Quest',
             icon: Icons.play_arrow,
+            iconAsset: 'assets/images/icons/processed/ui_play.png',
             fullWidth: true,
             onPressed: _busy ? null : _start,
           ),
@@ -261,8 +257,8 @@ class _CoverHeader extends StatelessWidget {
                             color: PixelColors.accentGold)),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: PixelColors.panelInner,
                       border: Border.all(color: PixelColors.borderSoft),

@@ -21,9 +21,13 @@ final classDefinitionsProvider =
 final avatarTemplatesProvider =
     FutureProvider<List<AvatarTemplate>>((ref) async {
   final db = ref.watch(dbProvider);
+  // Embed the signature skill (name + description) so the picker can
+  // show the ability blurb without a second query per avatar. PostgREST
+  // resolves the embed via the FK we added in migration
+  // 20260510_avatar_lore_and_signature_skills.
   final rows = await db
       .from('avatar_templates')
-      .select()
+      .select('*, skills:signature_skill_id(name, description)')
       .order('sort_order', ascending: true);
   return (rows as List<dynamic>)
       .map((r) => AvatarTemplate.fromJson(r as Map<String, dynamic>))

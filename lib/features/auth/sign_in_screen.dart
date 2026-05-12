@@ -67,12 +67,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           Image.asset(
             'assets/images/splash/loading_screen.png',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Image.asset(
-              'assets/images/logo/loading_screen.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  const ColoredBox(color: PixelColors.inkBackground),
-            ),
+            errorBuilder: (_, __, ___) =>
+                const ColoredBox(color: PixelColors.inkBackground),
           ),
           const DecoratedBox(
             decoration: BoxDecoration(

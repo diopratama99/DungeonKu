@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dungeonku/core/audio/bgm_manager.dart';
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/widgets/pixel_button.dart';
@@ -11,12 +12,33 @@ import 'package:dungeonku/data/repositories/campaigns_repository.dart';
 
 /// Final death-narration view. We pull the last DM message (which the death-narration
 /// pipeline persists), plus the campaign character snapshot at the moment of death.
-class GameOverScreen extends ConsumerWidget {
+class GameOverScreen extends ConsumerStatefulWidget {
   const GameOverScreen({required this.campaignId, super.key});
   final String campaignId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GameOverScreen> createState() => _GameOverScreenState();
+}
+
+class _GameOverScreenState extends ConsumerState<GameOverScreen> {
+  /// Whether we've already triggered the audio side effects for this mount.
+  /// FutureBuilder rebuilds many times and we only want one stinger.
+  bool _audioFired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Drop the looping campaign BGM the moment we land here — either the
+    // hero is dead (silence is the right beat) or they've won and the
+    // quest-complete fanfare is about to fire over silence.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(bgmManagerProvider).stop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final repo = ref.watch(campaignsRepositoryProvider);
 
     return Scaffold(
@@ -43,8 +65,9 @@ class GameOverScreen extends ConsumerWidget {
           SafeArea(
             child: FutureBuilder<List<dynamic>>(
               future: Future.wait([
-                repo.loadMessages(campaignId, limit: 200),
-                repo.loadCampaignCharacter(campaignId),
+                repo.loadMessages(widget.campaignId, limit: 200),
+                repo.loadCampaignCharacter(widget.campaignId),
+                ref.read(campaignsListProvider.future),
               ]),
               builder: (context, snap) {
                 if (snap.connectionState != ConnectionState.done) {
@@ -55,6 +78,19 @@ class GameOverScreen extends ConsumerWidget {
                 }
                 final messages = snap.data![0] as List<dynamic>;
                 final character = snap.data![1];
+                final campaigns = snap.data![2] as List<dynamic>;
+                final campaign = campaigns.firstWhereOrNull(
+                    (c) => (c as dynamic).id == widget.campaignId);
+                final completed = campaign != null &&
+                    (campaign as dynamic).status == 'completed';
+                // One-shot: fire the quest-complete fanfare on first build
+                // after the data resolves, but only if the player won.
+                if (!_audioFired) {
+                  _audioFired = true;
+                  if (completed) {
+                    ref.read(bgmManagerProvider).playQuestComplete();
+                  }
+                }
                 final lastDm = messages.lastWhereOrNull(
                   (m) => (m as dynamic).role == 'dm',
                 );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:dungeonku/core/audio/bgm_manager.dart';
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/utils/element_palette.dart';
@@ -23,12 +24,18 @@ class CharactersScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Was previously triggered by MainShell; the shell is gone, so each
+    // ex-tab screen now owns its own BGM nudge. Idempotent.
+    ref.read(bgmManagerProvider).playMenu();
     final charactersAsync = ref.watch(charactersListProvider);
     final avatarsAsync = ref.watch(avatarTemplatesProvider);
     final classesAsync = ref.watch(classDefinitionsProvider);
 
     return Scaffold(
-      appBar: const RetroAppBar(title: 'PARTY ROSTER'),
+      appBar: RetroAppBar(
+        title: 'PARTY ROSTER',
+        leading: PixelBackButton(onTap: () => context.go('/home')),
+      ),
       body: charactersAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) =>
@@ -284,6 +291,7 @@ class _CharacterCard extends ConsumerWidget {
             PixelButton(
               label: 'Begin Quest',
               icon: Icons.play_arrow,
+              iconAsset: 'assets/images/icons/processed/ui_play.png',
               fullWidth: true,
               onPressed: () =>
                   context.go('/campaigns/new?character_id=${character.id}'),

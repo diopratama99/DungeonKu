@@ -29,10 +29,7 @@ class CharacterCreationScreen extends ConsumerWidget {
     return Scaffold(
       appBar: RetroAppBar(
         title: 'FORGE A HERO',
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/characters'),
-        ),
+        leading: PixelBackButton(onTap: () => context.go('/characters')),
       ),
       body: classesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

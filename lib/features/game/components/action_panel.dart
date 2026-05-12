@@ -19,28 +19,45 @@ class ActionPanel extends StatelessWidget {
 
   IconData _iconFor(String key) {
     switch (key) {
-      case 'sword':    return Icons.handyman;
-      case 'sparkle':  return Icons.auto_awesome;
-      case 'shield':   return Icons.shield;
-      case 'running':  return Icons.directions_run;
-      case 'speech':   return Icons.chat_bubble_outline;
-      case 'check':    return Icons.check;
-      case 'cross':    return Icons.close;
-      case 'eye':      return Icons.visibility;
-      case 'magnify':  return Icons.search;
-      case 'footstep': return Icons.directions_walk;
-      case 'fire':     return Icons.local_fire_department;
-      case 'arrow':    return Icons.arrow_forward;
-      default:         return Icons.auto_awesome;
+      case 'sword':
+        return Icons.handyman;
+      case 'sparkle':
+        return Icons.auto_awesome;
+      case 'shield':
+        return Icons.shield;
+      case 'running':
+        return Icons.directions_run;
+      case 'speech':
+        return Icons.chat_bubble_outline;
+      case 'check':
+        return Icons.check;
+      case 'cross':
+        return Icons.close;
+      case 'eye':
+        return Icons.visibility;
+      case 'magnify':
+        return Icons.search;
+      case 'footstep':
+        return Icons.directions_walk;
+      case 'fire':
+        return Icons.local_fire_department;
+      case 'arrow':
+        return Icons.arrow_forward;
+      default:
+        return Icons.auto_awesome;
     }
   }
 
   PixelButtonTone _toneFor(String kind) {
     switch (kind) {
-      case 'pivotal':         return PixelButtonTone.danger;
-      case 'situational':     return PixelButtonTone.gold;
-      case 'template_common': return PixelButtonTone.neutral;
-      default:                return PixelButtonTone.gold;
+      case 'pivotal':
+        return PixelButtonTone.danger;
+      case 'situational':
+        return PixelButtonTone.gold;
+      case 'template_common':
+        return PixelButtonTone.neutral;
+      default:
+        return PixelButtonTone.gold;
     }
   }
 

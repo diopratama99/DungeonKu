@@ -29,6 +29,7 @@ import { decideNextPhase } from "../_shared/phase_rules.ts";
 import { applyStateChanges } from "../_shared/state_changes.ts";
 import { callStructured } from "../_shared/openai.ts";
 import { ENV } from "../_shared/env.ts";
+import { narrateRoll } from "../_shared/roll_narrator.ts";
 
 Deno.serve(async (req: Request) => {
   const preflight = handlePreflight(req);
@@ -175,6 +176,37 @@ Narrate the outcome in 1-2 sentences. Do NOT request another roll. Set requires_
   } catch (err) {
     log.error("llm_output_invalid", { err: (err as Error).message });
     return errorResponse(502, "llm_output_invalid", (err as Error).message);
+  }
+
+  // ------------------------------ Role D — Roll Narrator (optional) ----------------
+  // Overrides dm.narration with a vivid 1-2 sentence crit/fumble/big-margin line.
+  // Only fires when the user has the toggle on AND the roll qualifies.
+  const isCrit = roll.raw === 20;
+  const isFumble = roll.raw === 1;
+  const margin = roll.total - dc;
+  if (isCrit || isFumble || Math.abs(margin) >= 10) {
+    try {
+      const { data: profile } = await sb
+        .from("profiles")
+        .select("ai_role_roll_narrator_enabled")
+        .eq("id", campaign.user_id)
+        .maybeSingle();
+      if (profile?.ai_role_roll_narrator_enabled) {
+        const vivid = await narrateRoll({
+          scene: purpose,
+          skill_or_check: purpose,
+          rolled: roll.raw,
+          total: roll.total,
+          dc,
+          margin,
+          is_crit: isCrit,
+          is_fumble: isFumble,
+        });
+        if (vivid) dm.narration = vivid;
+      }
+    } catch (rErr) {
+      log.warn("roll_narrator_skipped", { err: (rErr as Error).message });
+    }
   }
 
   // ------------------------------ Apply state_changes ------------------------------

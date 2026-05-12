@@ -25,10 +25,7 @@ class TemplatePickerScreen extends ConsumerWidget {
     return Scaffold(
       appBar: RetroAppBar(
         title: 'PICK A STORY',
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/characters'),
-        ),
+        leading: PixelBackButton(onTap: () => context.go('/characters')),
       ),
       body: templatesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -137,8 +134,7 @@ class _TemplateCard extends StatelessWidget {
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
                             color: PixelColors.panelInner,
-                            border:
-                                Border.all(color: PixelColors.borderSoft),
+                            border: Border.all(color: PixelColors.borderSoft),
                           ),
                           child: Text(template.genre.toUpperCase(),
                               style: AppTheme.pressStart(7,

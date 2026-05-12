@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
-import 'package:dungeonku/core/widgets/element_icon.dart';
 import 'package:dungeonku/core/widgets/pixel_panel.dart';
 import 'package:dungeonku/core/widgets/pixel_progress_bar.dart';
+import 'package:dungeonku/core/widgets/skill_icon.dart';
 import 'package:dungeonku/data/models/campaign.dart';
 import 'package:dungeonku/data/models/character.dart';
 import 'package:dungeonku/data/models/reference.dart';
@@ -202,8 +202,13 @@ class _SkillRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.only(top: 2, right: 8),
-            child: ElementIcon(element: skill.element, size: 22),
+            padding: const EdgeInsets.only(top: 1, right: 8),
+            child: SkillIcon(
+              skillId: skill.id,
+              size: 34,
+              borderColor: color,
+              disabled: !affordable,
+            ),
           ),
           Expanded(
             child: Column(

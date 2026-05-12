@@ -30,15 +30,18 @@ class CampaignsRepository {
     required String templateId,
     required String name,
   }) async {
-    // Look up the character so we know its class for the snapshot.
+    // Look up the character so we know its class + chosen avatar for
+    // the snapshot. avatar_id is needed so we can grant the avatar's
+    // signature skill at campaign start (see below).
     final charRow = await _sb
         .from('characters')
-        .select('id, class, base_element, stats')
+        .select('id, class, base_element, stats, avatar_id')
         .eq('id', characterId)
         .single();
     final classId = charRow['class'] as String;
     final baseElement = charRow['base_element'] as String;
     final stats = (charRow['stats'] as Map<String, dynamic>);
+    final avatarId = charRow['avatar_id'] as String?;
 
     // Look up the class definition for HP/resource defaults.
     final classRow = await _sb
@@ -47,6 +50,21 @@ class CampaignsRepository {
             'starting_hp, resource_type, starting_resource, starting_ac, starting_skills')
         .eq('id', classId)
         .single();
+
+    // Resolve the avatar's signature skill (one bonus skill, narratively
+    // bound to the chosen portrait — see migration
+    // 20260510000000_avatar_lore_and_signature_skills). Tolerate missing
+    // wiring (legacy characters, partial DB state) by treating absence
+    // as "no signature skill" instead of failing campaign creation.
+    String? signatureSkillId;
+    if (avatarId != null) {
+      final avatarRow = await _sb
+          .from('avatar_templates')
+          .select('signature_skill_id')
+          .eq('id', avatarId)
+          .maybeSingle();
+      signatureSkillId = avatarRow?['signature_skill_id'] as String?;
+    }
 
     // Insert the campaign row.
     final campaignInserted = await _sb
@@ -78,15 +96,25 @@ class CampaignsRepository {
       'base_element': baseElement,
     });
 
-    // Starting skills.
-    final startingSkills =
-        (classRow['starting_skills'] as List<dynamic>?) ?? const [];
-    if (startingSkills.isNotEmpty) {
+    // Starting skills = class defaults + avatar signature.
+    //
+    // Class skills come from class_definitions.starting_skills (a json
+    // array of skill ids). We then prepend the chosen avatar's signature
+    // skill so the player has access to their portrait's unique ability
+    // from turn 1. De-dupe in case both lists ever overlap.
+    final classSkills =
+        ((classRow['starting_skills'] as List<dynamic>?) ?? const [])
+            .map((s) => s as String);
+    final allSkillIds = <String>{
+      if (signatureSkillId != null) signatureSkillId,
+      ...classSkills,
+    };
+    if (allSkillIds.isNotEmpty) {
       await _sb.from('campaign_skills').insert([
-        for (final s in startingSkills)
+        for (final skillId in allSkillIds)
           {
             'campaign_id': campaign.id,
-            'skill_id': s as String,
+            'skill_id': skillId,
             'learned_at_turn': 0,
           },
       ]);

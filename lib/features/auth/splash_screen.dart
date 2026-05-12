@@ -46,12 +46,8 @@ class _SplashScreenState extends State<SplashScreen>
           Image.asset(
             'assets/images/splash/loading_screen.png',
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Image.asset(
-              'assets/images/logo/loading_screen.png',
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  const ColoredBox(color: PixelColors.inkBackground),
-            ),
+            errorBuilder: (_, __, ___) =>
+                const ColoredBox(color: PixelColors.inkBackground),
           ),
           // Vignette so the wordmark + spinner read on busy art.
           const DecoratedBox(

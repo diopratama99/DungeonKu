@@ -13,6 +13,7 @@ class Campaign {
     required this.turnsSinceLastProgress,
     required this.totalTurns,
     required this.lastPlayedAt,
+    this.isLegacy = false,
   });
 
   final String id;
@@ -21,11 +22,16 @@ class Campaign {
   final String templateId;
   final String name;
   final String status; // 'active' | 'completed' | 'failed'
-  final String phase;  // 'intro' | 'rising' | 'climax' | 'resolution'
+  final String phase; // 'intro' | 'rising' | 'climax' | 'resolution'
   final int turnsInCurrentPhase;
   final int turnsSinceLastProgress;
   final int totalTurns;
   final DateTime lastPlayedAt;
+
+  /// True for campaigns created before the story-graph engine
+  /// (migration 20260511000000). Routed to the legacy LLM-driven
+  /// GameScreen instead of the new StoryScreen.
+  final bool isLegacy;
 
   factory Campaign.fromJson(Map<String, dynamic> json) => Campaign(
         id: json['id'] as String,
@@ -35,10 +41,13 @@ class Campaign {
         name: json['name'] as String,
         status: json['status'] as String,
         phase: json['phase'] as String,
-        turnsInCurrentPhase: (json['turns_in_current_phase'] as num? ?? 0).toInt(),
-        turnsSinceLastProgress: (json['turns_since_last_progress'] as num? ?? 0).toInt(),
+        turnsInCurrentPhase:
+            (json['turns_in_current_phase'] as num? ?? 0).toInt(),
+        turnsSinceLastProgress:
+            (json['turns_since_last_progress'] as num? ?? 0).toInt(),
         totalTurns: (json['total_turns'] as num? ?? 0).toInt(),
         lastPlayedAt: DateTime.parse(json['last_played_at'] as String),
+        isLegacy: (json['is_legacy'] as bool?) ?? false,
       );
 }
 

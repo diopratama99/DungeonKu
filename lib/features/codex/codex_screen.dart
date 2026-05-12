@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:dungeonku/core/audio/bgm_manager.dart';
 import 'package:dungeonku/core/theme/app_theme.dart';
 import 'package:dungeonku/core/theme/pixel_colors.dart';
 import 'package:dungeonku/core/utils/element_palette.dart';
@@ -8,6 +9,7 @@ import 'package:dungeonku/core/widgets/asset_or_network_image.dart';
 import 'package:dungeonku/core/widgets/element_icon.dart';
 import 'package:dungeonku/core/widgets/pixel_panel.dart';
 import 'package:dungeonku/core/widgets/retro_app_bar.dart';
+import 'package:dungeonku/core/widgets/skill_icon.dart';
 import 'package:dungeonku/data/models/reference.dart';
 import 'package:dungeonku/data/repositories/reference_repository.dart';
 import 'package:dungeonku/features/codex/codex_detail_screen.dart';
@@ -31,6 +33,13 @@ class _CodexScreenState extends ConsumerState<CodexScreen>
   void initState() {
     super.initState();
     _tab = TabController(length: 5, vsync: this);
+    // Same reasoning as the other ex-tab screens: nudge the menu BGM
+    // back on in case we landed here from a deep link / pop. Deferred to
+    // post-frame so we don't read providers during initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(bgmManagerProvider).playMenu();
+    });
   }
 
   @override
@@ -109,11 +118,16 @@ class _ClassesTab extends ConsumerWidget {
       ),
       itemBuilder: (_, i) {
         final cls = classes[i];
-        // Pick the first matching portrait as the "cover" art.
-        final portraits = avatars
-            .where((a) => a.fitsClass(cls.id))
-            .map((a) => a.imageUrl)
-            .toList(growable: false);
+        // Build the per-class portrait list once. We track names in a
+        // parallel array so the detail screen can label each carousel
+        // slide with the avatar it actually belongs to (warrior_01 →
+        // "Aric the Sworn", etc.).
+        final classAvatars =
+            avatars.where((a) => a.fitsClass(cls.id)).toList(growable: false);
+        final portraits =
+            classAvatars.map((a) => a.imageUrl).toList(growable: false);
+        final portraitNames =
+            classAvatars.map((a) => a.displayName).toList(growable: false);
         final cover = portraits.isNotEmpty
             ? portraits.first
             : 'assets/images/avatars/${cls.id}_01.png';
@@ -122,7 +136,8 @@ class _ClassesTab extends ConsumerWidget {
           title: cls.name,
           subtitle: cls.resourceType.toUpperCase(),
           accent: PixelColors.accentGold,
-          onTap: () => _openClassDetail(context, cls, portraits, skills),
+          onTap: () =>
+              _openClassDetail(context, cls, portraits, portraitNames, skills),
         );
       },
     );
@@ -132,6 +147,7 @@ class _ClassesTab extends ConsumerWidget {
     BuildContext context,
     ClassDefinition cls,
     List<String> portraits,
+    List<String> portraitNames,
     List<Skill> allSkills,
   ) {
     final classSkills = allSkills
@@ -146,6 +162,7 @@ class _ClassesTab extends ConsumerWidget {
           imageAssets: portraits.isEmpty
               ? ['assets/images/avatars/${cls.id}_01.png']
               : portraits,
+          imageCaptions: portraitNames.isEmpty ? null : portraitNames,
           accent: PixelColors.accentGold,
           sections: [
             CodexSection(title: 'Lore', body: cls.description),
@@ -320,20 +337,10 @@ class _SkillRow extends StatelessWidget {
         child: Row(
           children: [
             // Pixel-art icon — skill ids match filenames in assets/skills/.
-            Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: PixelColors.inkBackground,
-                border: Border.all(color: tone, width: 2),
-              ),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: AssetOrNetworkImage(
-                  imageUrl: 'assets/images/skills/${skill.id}.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
+            SkillIcon(
+              skillId: skill.id,
+              size: 60,
+              borderColor: tone,
             ),
             const SizedBox(width: 12),
             Expanded(
